@@ -14,8 +14,8 @@
 #include <spdlog/stopwatch.h>
 
 #include "Face.h"
-#include "UVCoord.h"
-#include "Vertex.h"
+#include "Point2F.h"
+#include "Point3F.h"
 #include "unwrap.h"
 
 int main(int argc, char** argv)
@@ -84,7 +84,7 @@ int main(int argc, char** argv)
             spdlog::info("Processing (unnamed) mesh", mesh->mName.data);
         }
 
-        std::vector<Vertex> vertices;
+        std::vector<Point3F> vertices;
         vertices.reserve(mesh->mNumVertices);
         for (size_t j = 0; j < mesh->mNumVertices; j++)
         {
@@ -100,7 +100,7 @@ int main(int argc, char** argv)
             indices.emplace_back(face.mIndices[0], face.mIndices[1], face.mIndices[2]);
         }
 
-        std::vector<UVCoord> uv_coords(mesh->mNumVertices, { 0.0, 0.0 });
+        std::vector<Point2F> uv_coords(mesh->mNumVertices, { 0.0, 0.0 });
         uint32_t texture_width, texture_height;
 
         spdlog::stopwatch timer;
@@ -132,10 +132,10 @@ int main(int argc, char** argv)
                         export_mesh->mTextureCoords[j] = new aiVector3D[export_mesh->mNumVertices];
                         for (size_t k = 0; k < export_mesh->mNumVertices; k++)
                         {
-                            const UVCoord& uv = uv_coords[k];
+                            const Point2F& uv = uv_coords[k];
                             aiVector3D& export_uv = export_mesh->mTextureCoords[j][k];
-                            export_uv.x = uv.u;
-                            export_uv.y = uv.v;
+                            export_uv.x = uv.x;
+                            export_uv.y = uv.y;
                         }
                     }
                     else

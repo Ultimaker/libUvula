@@ -1,35 +1,35 @@
-#include "Matrix.h"
+#include "Matrix33F.h"
 
 #include <cmath>
 #include <limits>
 
-#include "UVCoord.h"
-#include "Vector.h"
-#include "Vertex.h"
+#include "Point2F.h"
+#include "Point3F.h"
+#include "Vector3F.h"
 
 
-void Matrix::transpose()
+void Matrix33F::transpose()
 {
     std::swap(values_[0][1], values_[1][0]);
     std::swap(values_[0][2], values_[2][0]);
     std::swap(values_[1][2], values_[2][1]);
 }
 
-UVCoord Matrix::project(const Vertex& vertex) const
+Point2F Matrix33F::project(const Point3F& vertex) const
 {
-    return UVCoord{ .u = (values_[0][0] * vertex.x) + (values_[1][0] * vertex.y) + (values_[2][0] * vertex.z),
-                    .v = (values_[0][1] * vertex.x) + (values_[1][1] * vertex.y) + (values_[2][1] * vertex.z) };
+    return Point2F{ .x = (values_[0][0] * vertex.x()) + (values_[1][0] * vertex.y()) + (values_[2][0] * vertex.z()),
+                    .y = (values_[0][1] * vertex.x()) + (values_[1][1] * vertex.y()) + (values_[2][1] * vertex.z()) };
 }
 
-Matrix Matrix::makeOrthogonalBasis(const Vector& normal)
+Matrix33F Matrix33F::makeOrthogonalBasis(const Vector3F& normal)
 {
-    Matrix matrix;
+    Matrix33F matrix;
     matrix.values_[2][0] = normal.x();
     matrix.values_[2][1] = normal.y();
     matrix.values_[2][2] = normal.z();
 
     constexpr float eps = std::numeric_limits<float>::epsilon();
-    const float length_squared = Vector(normal.x(), normal.y(), 0.0).lengthSquared();
+    const float length_squared = Vector3F(normal.x(), normal.y(), 0.0).lengthSquared();
 
     if (length_squared > eps)
     {

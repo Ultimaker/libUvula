@@ -2,15 +2,15 @@
 
 #include <numbers>
 
-#include "Vector.h"
+#include "Vector3F.h"
 
 
 namespace geometry_utils
 {
 
-std::optional<Vector> triangleNormal(const Vertex& v1, const Vertex& v2, const Vertex& v3)
+std::optional<Vector3F> triangleNormal(const Point3F& v1, const Point3F& v2, const Point3F& v3)
 {
-    return Vector(v1, v2).cross(Vector(v1, v3)).normalized();
+    return Vector3F(v1, v2).cross(Vector3F(v1, v3)).normalized();
 }
 
 float deg2rad(float angle)
