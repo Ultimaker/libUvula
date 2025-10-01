@@ -6,7 +6,8 @@
 #include <span>
 #include <vector>
 
-struct Face;
+#include "Face.h"
+
 struct Point3F;
 struct Point2F;
 class Matrix44F;
@@ -19,11 +20,12 @@ std::vector<Polygon> project(
     const std::span<Point3F>& mesh_vertices,
     const std::span<Face>& mesh_indices,
     const std::span<Point2F>& mesh_uv,
+    const std::span<FaceSigned>& mesh_faces_connectivity,
     const uint32_t texture_width,
     const uint32_t texture_height,
     const Matrix44F& camera_projection_matrix,
     const bool is_camera_perspective,
-    const int viewport_width,
-    const int viewport_height,
+    const uint32_t viewport_width,
+    const uint32_t viewport_height,
     const Vector3F& camera_normal,
-    const std::span<uint32_t>& faces);
+    const uint32_t face_id);

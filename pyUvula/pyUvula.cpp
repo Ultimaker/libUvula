@@ -55,7 +55,8 @@ py::list pyProject(
     const py::array_t<float>& stroke_polygon_array,
     const py::array_t<float>& mesh_vertices_array,
     const py::array_t<uint32_t>& mesh_indices_array,
-    const py::array_t<float>& mesh_uv_coordinates,
+    const py::array_t<float>& mesh_uv_array,
+    const py::array_t<int32_t>& mesh_faces_connectivity_array,
     const uint32_t texture_width,
     const uint32_t texture_height,
     const py::array_t<float>& camera_projection_matrix_array,
@@ -63,19 +64,22 @@ py::list pyProject(
     const uint32_t viewport_width,
     const uint32_t viewport_height,
     const py::array_t<float>& camera_normal_array,
-    const py::array_t<uint32_t>& faces_array)
+    const uint32_t face_id)
 {
-    const pybind11::buffer_info stroke_polygon_buf = stroke_polygon_array.request();
-    const std::span<Point2F> stroke_polygon(static_cast<Point2F*>(stroke_polygon_buf.ptr), stroke_polygon_buf.shape[0]);
+    pybind11::buffer_info stroke_polygon_buffer = stroke_polygon_array.request();
+    const std::span<Point2F> stroke_polygon = std::span(static_cast<Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.shape[0]);
 
-    const pybind11::buffer_info mesh_vertices_buf = mesh_vertices_array.request();
-    const std::span<Point3F> mesh_vertices(static_cast<Point3F*>(mesh_vertices_buf.ptr), mesh_vertices_buf.shape[0]);
+    pybind11::buffer_info mesh_vertices_buffer = mesh_vertices_array.request();
+    const std::span<Point3F> mesh_vertices = std::span(static_cast<Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
 
-    const pybind11::buffer_info mesh_indices_buf = mesh_indices_array.request();
-    const std::span<Face> mesh_indices(static_cast<Face*>(mesh_indices_buf.ptr), mesh_indices_buf.shape[0]);
+    pybind11::buffer_info mesh_indices_buffer = mesh_indices_array.request();
+    const std::span<Face> mesh_indices = std::span(static_cast<Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
 
-    const pybind11::buffer_info mesh_uv_buf = mesh_uv_coordinates.request();
-    const std::span<Point2F> mesh_uv(static_cast<Point2F*>(mesh_uv_buf.ptr), mesh_uv_buf.shape[0]);
+    pybind11::buffer_info mesh_uv_buffer = mesh_uv_array.request();
+    const std::span<Point2F> mesh_uv = std::span(static_cast<Point2F*>(mesh_uv_buffer.ptr), mesh_uv_buffer.shape[0]);
+
+    pybind11::buffer_info mesh_faces_connectivity_buffer = mesh_faces_connectivity_array.request();
+    const std::span<FaceSigned> mesh_faces_connectivity = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
 
     const pybind11::buffer_info camera_projection_matrix_buf = camera_projection_matrix_array.request();
     const Matrix44F camera_projection_matrix(*static_cast<float(*)[4][4]>(camera_projection_matrix_buf.ptr));
@@ -84,14 +88,12 @@ py::list pyProject(
     const float* camera_normal_ptr = static_cast<float*>(camera_normal_buf.ptr);
     const Vector3F camera_normal(camera_normal_ptr[0], camera_normal_ptr[1], camera_normal_ptr[2]);
 
-    const pybind11::buffer_info faces_buf = faces_array.request();
-    const std::span<uint32_t> faces(static_cast<uint32_t*>(faces_buf.ptr), faces_buf.shape[0]);
-
     std::vector<Polygon> result = project(
         stroke_polygon,
         mesh_vertices,
         mesh_indices,
         mesh_uv,
+        mesh_faces_connectivity,
         texture_width,
         texture_height,
         camera_projection_matrix,
@@ -99,7 +101,7 @@ py::list pyProject(
         viewport_width,
         viewport_height,
         camera_normal,
-        faces);
+        face_id);
 
     py::list py_result;
     for (Polygon& polygon : result)

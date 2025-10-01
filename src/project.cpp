@@ -3,10 +3,10 @@
 #include "project.h"
 
 #include <polyclipping/clipper.hpp>
+#include <unordered_set>
 
 #include <spdlog/spdlog.h>
 
-#include "Face.h"
 #include "Matrix44F.h"
 #include "Point2F.h"
 #include "Point3F.h"
@@ -173,21 +173,35 @@ std::vector<Polygon> project(
     const std::span<Point3F>& mesh_vertices,
     const std::span<Face>& mesh_indices,
     const std::span<Point2F>& mesh_uv,
+    const std::span<FaceSigned>& mesh_faces_connectivity,
     const uint32_t texture_width,
     const uint32_t texture_height,
     const Matrix44F& camera_projection_matrix,
     const bool is_camera_perspective,
-    const int viewport_width,
-    const int viewport_height,
+    const uint32_t viewport_width,
+    const uint32_t viewport_height,
     const Vector3F& camera_normal,
-    const std::span<uint32_t>& faces)
+    const uint32_t face_id)
 {
     std::vector<Polygon> result;
     const ClipperLib::Path stroke_polygon_path = toPath(stroke_polygon);
 
-    for (const uint32_t face_index : faces)
+    std::unordered_set<uint32_t> candidate_faces{ face_id };
+    std::unordered_set<uint32_t> processed_faces;
+
+    while (! candidate_faces.empty())
     {
-        const Face face = getFace(mesh_indices, face_index);
+        auto iterator = candidate_faces.begin();
+        const uint32_t candidate_face_id = *iterator;
+        candidate_faces.erase(iterator);
+
+        // if (processed_faces.contains(candidate_face_id))
+        // {
+        //     continue;
+        // }
+        processed_faces.insert(candidate_face_id);
+
+        const Face face = getFace(mesh_indices, candidate_face_id);
         const Triangle3F face_triangle = getFaceTriangle(mesh_vertices, face);
         const Vector3F face_normal = face_triangle.normal();
 
@@ -200,8 +214,13 @@ std::vector<Polygon> project(
         const Triangle2F projected_face_triangle = projectToViewport(face_triangle, camera_projection_matrix, is_camera_perspective, viewport_width, viewport_height);
         const ClipperLib::Path projected_face_triangle_path = toPath(std::initializer_list{ projected_face_triangle.p1, projected_face_triangle.p2, projected_face_triangle.p3 });
         const std::vector<Polygon> uv_areas = toPolygons(intersect(stroke_polygon_path, projected_face_triangle_path));
-        const Triangle2F face_uv = getFaceUv(mesh_uv, face);
 
+        if (uv_areas.empty())
+        {
+            continue;
+        }
+
+        const Triangle2F face_uv = getFaceUv(mesh_uv, face);
         for (const Polygon& uv_area : uv_areas)
         {
             const std::optional<std::vector<Point3F>> projected_stroke_polygon = getBarycentricCoordinates(uv_area, projected_face_triangle);
@@ -218,6 +237,15 @@ std::vector<Polygon> project(
             }
 
             result.push_back(std::move(result_polygon));
+        }
+
+        const FaceSigned& connected_faces = mesh_faces_connectivity[candidate_face_id];
+        for (const int32_t connected_face : { connected_faces.i1, connected_faces.i2, connected_faces.i3 })
+        {
+            if (connected_face >= 0 && ! processed_faces.contains(connected_face))
+            {
+                candidate_faces.insert(connected_face);
+            }
         }
     }
 
