@@ -162,7 +162,7 @@ std::vector<Polygon> toPolygons(const ClipperLib::Paths& paths)
             result_polygon.emplace_back(point.X / CLIPPER_PRECISION, point.Y / CLIPPER_PRECISION);
         }
 
-        result.emplace_back(std::move(result_polygon));
+        result.push_back(std::move(result_polygon));
     }
 
     return result;
@@ -195,10 +195,6 @@ std::vector<Polygon> project(
         const uint32_t candidate_face_id = *iterator;
         candidate_faces.erase(iterator);
 
-        // if (processed_faces.contains(candidate_face_id))
-        // {
-        //     continue;
-        // }
         processed_faces.insert(candidate_face_id);
 
         const Face face = getFace(mesh_indices, candidate_face_id);
