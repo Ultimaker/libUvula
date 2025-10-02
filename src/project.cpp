@@ -30,7 +30,7 @@ Triangle3F getFaceTriangle(const std::span<Point3F>& mesh_vertices, const Face& 
 
 Triangle2F getFaceUv(const std::span<Point2F>& mesh_uv, const Face& face)
 {
-    return Triangle2F(mesh_uv[face.i1], mesh_uv[face.i2], mesh_uv[face.i3]);
+    return Triangle2F{ mesh_uv[face.i1], mesh_uv[face.i2], mesh_uv[face.i3] };
 }
 
 Point2F projectToViewport(const Point3F& point, const Matrix44F& matrix, const bool is_camera_perspective, const int viewport_width, const int viewport_height)
@@ -42,7 +42,7 @@ Point2F projectToViewport(const Point3F& point, const Matrix44F& matrix, const b
         projected /= (projected.z() * 2.0f);
     }
 
-    return Point2F(projected.x() * viewport_width / 2.0f, projected.y() * viewport_height / 2.0f);
+    return Point2F{ projected.x() * viewport_width / 2.0f, projected.y() * viewport_height / 2.0f };
 }
 
 Triangle2F projectToViewport(const Triangle3F& triangle, const Matrix44F& matrix, const bool is_camera_perspective, const int viewport_width, const int viewport_height)
@@ -99,19 +99,7 @@ Point2F getTextureCoordinates(const Point3F& barycentric_coordinates, const Tria
 {
     const float u = (uv_coordinates.p1.x * barycentric_coordinates.x()) + (uv_coordinates.p2.x * barycentric_coordinates.y()) + (uv_coordinates.p3.x * barycentric_coordinates.z());
     const float v = (uv_coordinates.p1.y * barycentric_coordinates.x()) + (uv_coordinates.p2.y * barycentric_coordinates.y()) + (uv_coordinates.p3.y * barycentric_coordinates.z());
-    return Point2F(u * texture_width, v * texture_height);
-}
-
-template<typename RangeOrInitList>
-void addClipperPath(const RangeOrInitList& polygon, const ClipperLib::PolyType type, ClipperLib::Clipper& clipper)
-{
-    ClipperLib::Path path;
-    path.reserve(std::size(polygon));
-    for (const Point2F& point : polygon)
-    {
-        path.emplace_back(std::llround(point.x * CLIPPER_PRECISION), std::llround(point.y * CLIPPER_PRECISION));
-    }
-    clipper.AddPath(path, type, true);
+    return Point2F{ u * texture_width, v * texture_height };
 }
 
 template<typename RangeOrInitList>
@@ -121,7 +109,7 @@ ClipperLib::Path toPath(const RangeOrInitList& polygon)
     path.reserve(std::size(polygon));
     for (const Point2F& point : polygon)
     {
-        path.emplace_back(std::llround(point.x * CLIPPER_PRECISION), std::llround(point.y * CLIPPER_PRECISION));
+        path.push_back(ClipperLib::IntPoint{ std::llround(point.x * CLIPPER_PRECISION), std::llround(point.y * CLIPPER_PRECISION) });
     }
     return path;
 }
@@ -159,7 +147,7 @@ std::vector<Polygon> toPolygons(const ClipperLib::Paths& paths)
         result_polygon.reserve(path.size());
         for (const ClipperLib::IntPoint& point : path)
         {
-            result_polygon.emplace_back(point.X / CLIPPER_PRECISION, point.Y / CLIPPER_PRECISION);
+            result_polygon.push_back(Point2F{ point.X / CLIPPER_PRECISION, point.Y / CLIPPER_PRECISION });
         }
 
         result.push_back(std::move(result_polygon));
@@ -208,7 +196,8 @@ std::vector<Polygon> project(
         }
 
         const Triangle2F projected_face_triangle = projectToViewport(face_triangle, camera_projection_matrix, is_camera_perspective, viewport_width, viewport_height);
-        const ClipperLib::Path projected_face_triangle_path = toPath(std::initializer_list{ projected_face_triangle.p1, projected_face_triangle.p2, projected_face_triangle.p3 });
+        const ClipperLib::Path projected_face_triangle_path
+            = toPath(std::initializer_list<Point2F>{ projected_face_triangle.p1, projected_face_triangle.p2, projected_face_triangle.p3 });
         const std::vector<Polygon> uv_areas = toPolygons(intersect(stroke_polygon_path, projected_face_triangle_path));
 
         if (uv_areas.empty())

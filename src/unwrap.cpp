@@ -12,7 +12,6 @@
 #include <range/v3/view/map.hpp>
 #include <spdlog/spdlog.h>
 
-#include "Face.h"
 #include "Matrix33F.h"
 #include "Point2F.h"
 #include "Point3F.h"
