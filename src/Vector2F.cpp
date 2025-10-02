@@ -1,8 +1,5 @@
 #include "Vector2F.h"
 
-#include <cmath>
-#include <limits>
-
 #include "Point2F.h"
 
 Vector2F::Vector2F(const float x, const float y)

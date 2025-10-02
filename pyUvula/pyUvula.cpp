@@ -3,8 +3,6 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
-#include <spdlog/spdlog.h>
-
 #include "Face.h"
 #include "Matrix44F.h"
 #include "Point2F.h"
