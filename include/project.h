@@ -32,7 +32,7 @@ using Polygon = std::vector<Point2F>;
  * \param face_id                  The ID of the initial face to project onto, other will be propagated using connectivity information.
  * \return A vector of polygons in UV space resulting from the projection.
  */
-std::vector<Polygon> project(
+std::vector<Polygon> doProject(
     const std::span<Point2F>& stroke_polygon,
     const std::span<Point3F>& mesh_vertices,
     const std::span<Face>& mesh_indices,

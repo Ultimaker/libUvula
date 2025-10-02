@@ -155,7 +155,7 @@ std::vector<Polygon> toPolygons(const ClipperLib::Paths& paths)
     return result;
 }
 
-std::vector<Polygon> project(
+std::vector<Polygon> doProject(
     const std::span<Point2F>& stroke_polygon,
     const std::span<Point3F>& mesh_vertices,
     const std::span<Face>& mesh_indices,

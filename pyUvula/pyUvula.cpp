@@ -13,7 +13,7 @@
 
 namespace py = pybind11;
 
-py::tuple unwrap(const py::array_t<float>& vertices_array, const py::array_t<int32_t>& indices_array)
+py::tuple pyUnwrap(const py::array_t<float>& vertices_array, const py::array_t<int32_t>& indices_array)
 {
     // input shaping
     const pybind11::buffer_info vertices_buf = vertices_array.request();
@@ -86,7 +86,7 @@ py::list pyProject(
     const float* camera_normal_ptr = static_cast<float*>(camera_normal_buf.ptr);
     const Vector3F camera_normal(camera_normal_ptr[0], camera_normal_ptr[1], camera_normal_ptr[2]);
 
-    std::vector<Polygon> result = project(
+    std::vector<Polygon> result = doProject(
         stroke_polygon,
         mesh_vertices,
         mesh_indices,
@@ -122,6 +122,6 @@ PYBIND11_MODULE(pyUvula, module)
     module.doc() = "UV-unwrapping library (or bindings to library), segmentation uses a classic normal-based grouping and charts packing uses xatlas";
     module.attr("__version__") = PYUVULA_VERSION;
 
-    module.def("unwrap", &unwrap, "Given the vertices, indices of a mesh, unwrap UV for texture-coordinates.");
+    module.def("unwrap", &pyUnwrap, "Given the vertices, indices of a mesh, unwrap UV for texture-coordinates.");
     module.def("project", &pyProject, "Projects a stroke polygon into an object texture.");
 }
