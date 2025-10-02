@@ -47,10 +47,9 @@ Point2F projectToViewport(const Point3F& point, const Matrix44F& matrix, const b
 
 Triangle2F projectToViewport(const Triangle3F& triangle, const Matrix44F& matrix, const bool is_camera_perspective, const int viewport_width, const int viewport_height)
 {
-    return Triangle2F(
-        projectToViewport(triangle.p1(), matrix, is_camera_perspective, viewport_width, viewport_height),
-        projectToViewport(triangle.p2(), matrix, is_camera_perspective, viewport_width, viewport_height),
-        projectToViewport(triangle.p3(), matrix, is_camera_perspective, viewport_width, viewport_height));
+    return Triangle2F{ projectToViewport(triangle.p1(), matrix, is_camera_perspective, viewport_width, viewport_height),
+                       projectToViewport(triangle.p2(), matrix, is_camera_perspective, viewport_width, viewport_height),
+                       projectToViewport(triangle.p3(), matrix, is_camera_perspective, viewport_width, viewport_height) };
 }
 
 std::optional<std::vector<Point3F>> getBarycentricCoordinates(const Polygon& polygon, const Triangle2F& triangle)
