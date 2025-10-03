@@ -4,16 +4,14 @@
 
 #include <cstdint>
 
-struct Face
+template<typename IndexType>
+struct FaceIndex
 {
-    uint32_t i1{ 0 };
-    uint32_t i2{ 0 };
-    uint32_t i3{ 0 };
+    IndexType i1{ 0 };
+    IndexType i2{ 0 };
+    IndexType i3{ 0 };
 };
 
-struct FaceSigned
-{
-    int32_t i1{ 0 };
-    int32_t i2{ 0 };
-    int32_t i3{ 0 };
-};
+using Face = FaceIndex<uint32_t>;
+
+using FaceSigned = FaceIndex<int32_t>;
