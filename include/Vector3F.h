@@ -4,7 +4,7 @@
 
 #include <optional>
 
-struct Point3F;
+class Point3F;
 
 class Vector3F
 {

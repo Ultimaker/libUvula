@@ -7,7 +7,7 @@
 
 #include "Face.h"
 
-struct Point3F;
+class Point3F;
 struct Point2F;
 
 /*!

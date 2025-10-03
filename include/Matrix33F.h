@@ -3,7 +3,7 @@
 #pragma once
 
 struct Point2F;
-struct Point3F;
+class Point3F;
 class Vector3F;
 
 class Matrix33F

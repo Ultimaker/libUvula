@@ -8,7 +8,7 @@
 
 #include "Face.h"
 
-struct Point3F;
+class Point3F;
 struct Point2F;
 class Matrix44F;
 class Vector3F;
