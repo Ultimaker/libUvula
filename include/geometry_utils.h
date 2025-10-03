@@ -4,13 +4,13 @@
 
 #include <optional>
 
-struct Vertex;
-class Vector;
+class Point3F;
+class Vector3F;
 
 namespace geometry_utils
 {
 
-std::optional<Vector> triangleNormal(const Vertex& v1, const Vertex& v2, const Vertex& v3);
+std::optional<Vector3F> triangleNormal(const Point3F& v1, const Point3F& v2, const Point3F& v3);
 
 float deg2rad(float angle);
 

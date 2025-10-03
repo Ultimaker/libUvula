@@ -5,9 +5,10 @@
 #include <cstdint>
 #include <vector>
 
-struct Face;
-struct Vertex;
-struct UVCoord;
+#include "Face.h"
+
+class Point3F;
+struct Point2F;
 
 /*!
  * Groups, projects and packs the faces of the input mesh to non-overlapping and properly distributed UV coordinates patches
@@ -18,4 +19,4 @@ struct UVCoord;
  * @param texture_height Output height to be used for the texture image
  * @return
  */
-bool smartUnwrap(const std::vector<Vertex>& vertices, const std::vector<Face>& faces, std::vector<UVCoord>& uv_coords, uint32_t& texture_width, uint32_t& texture_height);
+bool smartUnwrap(const std::vector<Point3F>& vertices, const std::vector<Face>& faces, std::vector<Point2F>& uv_coords, uint32_t& texture_width, uint32_t& texture_height);

@@ -2,8 +2,8 @@
 
 #pragma once
 
-struct UVCoord
+struct Point2F
 {
-    float u{ 0.0 };
-    float v{ 0.0 };
+    float x{ 0.0 };
+    float y{ 0.0 };
 };

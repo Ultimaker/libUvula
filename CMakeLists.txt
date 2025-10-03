@@ -4,6 +4,7 @@ project(uvula)
 find_package(standardprojectsettings REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(range-v3 REQUIRED)
+find_package(clipper REQUIRED)
 
 option(EXTENSIVE_WARNINGS "Build with all warnings" ON)
 
@@ -21,8 +22,13 @@ message(STATUS "Configuring Uvula version: ${UVULA_VERSION}")
 set(UVULA_SRC
         src/xatlas.cpp
         src/unwrap.cpp
-        src/Vector.cpp
-        src/Matrix.cpp
+        src/project.cpp
+        src/Vector3F.cpp
+        src/Vector2F.cpp
+        src/Matrix33F.cpp
+        src/Matrix44F.cpp
+        src/Triangle3F.cpp
+        src/Point3F.cpp
         src/geometry_utils.cpp
 )
 add_library(libuvula STATIC ${UVULA_SRC})
@@ -31,6 +37,7 @@ target_link_libraries(libuvula
         PUBLIC
         spdlog::spdlog
         range-v3::range-v3
+        clipper::clipper
 )
 
 target_include_directories(libuvula

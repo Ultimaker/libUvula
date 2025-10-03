@@ -12,11 +12,10 @@
 #include <range/v3/view/map.hpp>
 #include <spdlog/spdlog.h>
 
-#include "Face.h"
-#include "Matrix.h"
-#include "UVCoord.h"
-#include "Vector.h"
-#include "Vertex.h"
+#include "Matrix33F.h"
+#include "Point2F.h"
+#include "Point3F.h"
+#include "Vector3F.h"
 #include "geometry_utils.h"
 #include "xatlas.h"
 
@@ -25,7 +24,7 @@ struct FaceData
 {
     const Face* face;
     size_t face_index;
-    Vector normal;
+    Vector3F normal;
 };
 
 /*!
@@ -33,7 +32,7 @@ struct FaceData
  * @param faces_data The faces data
  * @return A list of normals that are far enough from each other
  */
-std::vector<Vector> calculateProjectionNormals(const std::vector<FaceData>& faces_data)
+std::vector<Vector3F> calculateProjectionNormals(const std::vector<FaceData>& faces_data)
 {
     constexpr float group_angle_limit = 20.0;
 
@@ -41,9 +40,9 @@ std::vector<Vector> calculateProjectionNormals(const std::vector<FaceData>& face
     const float group_angle_limit_half_cos = std::cos(geometry_utils::deg2rad(group_angle_limit / 2));
 
     // First group will be based on the normal of the very first face
-    const Vector* project_normal = &faces_data.front().normal;
+    const Vector3F* project_normal = &faces_data.front().normal;
 
-    std::vector<Vector> projection_normals;
+    std::vector<Vector3F> projection_normals;
 
     // Create an internal list containing pointers to all the faces data, it will be reorganized
     std::vector<const FaceData*> faces_to_process(faces_data.size());
@@ -83,11 +82,11 @@ std::vector<Vector> calculateProjectionNormals(const std::vector<FaceData>& face
         unprocessed_faces.begin = current_faces_group.end;
 
         // Sum all the normals of the current faces group to get the average direction
-        Vector summed_normals = std::accumulate(
+        Vector3F summed_normals = std::accumulate(
             current_faces_group.begin,
             current_faces_group.end,
-            Vector(),
-            [](const Vector& normal, const FaceData* face_data)
+            Vector3F(),
+            [](const Vector3F& normal, const FaceData* face_data)
             {
                 return normal + face_data->normal;
             });
@@ -103,7 +102,7 @@ std::vector<Vector> calculateProjectionNormals(const std::vector<FaceData>& face
         for (auto iterator = unprocessed_faces.begin; iterator != unprocessed_faces.end; ++iterator)
         {
             float face_best_angle = std::numeric_limits<float>::lowest();
-            for (const Vector& projection_normal : projection_normals)
+            for (const Vector3F& projection_normal : projection_normals)
             {
                 face_best_angle = std::max(face_best_angle, projection_normal.dot((*iterator)->normal));
             }
@@ -133,18 +132,18 @@ std::vector<Vector> calculateProjectionNormals(const std::vector<FaceData>& face
     return projection_normals;
 }
 
-static std::vector<FaceData> makeFacesData(const std::vector<Vertex>& vertices, const std::vector<Face>& faces)
+static std::vector<FaceData> makeFacesData(const std::vector<Point3F>& vertices, const std::vector<Face>& faces)
 {
     std::vector<FaceData> faces_data;
     faces_data.reserve(faces.size());
 
     for (const auto& [index, face] : faces | ranges::views::enumerate)
     {
-        const Vertex& v1 = vertices[face.i1];
-        const Vertex& v2 = vertices[face.i2];
-        const Vertex& v3 = vertices[face.i3];
+        const Point3F& v1 = vertices[face.i1];
+        const Point3F& v2 = vertices[face.i2];
+        const Point3F& v3 = vertices[face.i3];
 
-        const std::optional<Vector> triangle_normal = geometry_utils::triangleNormal(v1, v2, v3);
+        const std::optional<Vector3F> triangle_normal = geometry_utils::triangleNormal(v1, v2, v3);
         if (triangle_normal.has_value())
         {
             faces_data.push_back(FaceData{ &face, index, triangle_normal.value() });
@@ -162,7 +161,7 @@ static std::vector<FaceData> makeFacesData(const std::vector<Vertex>& vertices, 
  *                  raw UV coordinates that overlap and are not in the [0,1] range
  * @return A list containing grouped indices of faces
  */
-static std::vector<std::vector<size_t>> makeCharts(const std::vector<Vertex>& vertices, const std::vector<Face>& faces, std::vector<UVCoord>& uv_coords)
+static std::vector<std::vector<size_t>> makeCharts(const std::vector<Point3F>& vertices, const std::vector<Face>& faces, std::vector<Point2F>& uv_coords)
 {
     const std::vector<FaceData> faces_data = makeFacesData(vertices, faces);
     if (faces_data.empty()) [[unlikely]]
@@ -171,20 +170,20 @@ static std::vector<std::vector<size_t>> makeCharts(const std::vector<Vertex>& ve
     }
 
     // Calculate the best normals to group the faces
-    const std::vector<Vector> project_normal_array = calculateProjectionNormals(faces_data);
+    const std::vector<Vector3F> project_normal_array = calculateProjectionNormals(faces_data);
     if (project_normal_array.empty()) [[unlikely]]
     {
         return {};
     }
 
     // For each face, find the best projection normal and make groups
-    std::map<const Vector*, std::vector<const FaceData*>> projected_faces_groups;
+    std::map<const Vector3F*, std::vector<const FaceData*>> projected_faces_groups;
     for (const FaceData& face_data : faces_data)
     {
-        const Vector* best_projection_normal = nullptr;
+        const Vector3F* best_projection_normal = nullptr;
         float angle_best = std::numeric_limits<float>::lowest();
 
-        for (const Vector& projection_normal : project_normal_array)
+        for (const Vector3F& projection_normal : project_normal_array)
         {
             const float angle = face_data.normal.dot(projection_normal);
             if (angle > angle_best)
@@ -201,7 +200,7 @@ static std::vector<std::vector<size_t>> makeCharts(const std::vector<Vertex>& ve
     std::vector<std::vector<size_t>> grouped_faces_indices;
     for (const auto& [normal, faces_data] : projected_faces_groups)
     {
-        const Matrix axis_mat = Matrix::makeOrthogonalBasis(*normal);
+        const Matrix33F axis_mat = Matrix33F::makeOrthogonalBasis(*normal);
         std::vector<size_t> faces_group;
         faces_group.reserve(faces_data.size());
 
@@ -328,10 +327,10 @@ std::vector<std::vector<size_t>> splitNonLinkedFacesCharts(const std::vector<std
  * @param vertices The original list of vertices position
  * @return The modified list of faces, which contains as many faces but with merged vertices
  */
-std::vector<Face> groupSimilarVertices(const std::vector<Face>& faces, const std::vector<Vertex>& vertices)
+std::vector<Face> groupSimilarVertices(const std::vector<Face>& faces, const std::vector<Point3F>& vertices)
 {
     std::vector<Face> faces_with_similar_indices;
-    std::map<Vertex, size_t> unique_vertices_indices;
+    std::map<Point3F, size_t> unique_vertices_indices;
     std::vector<uint32_t> new_vertices_indices(vertices.size());
 
     for (const auto [index, vertex] : vertices | ranges::views::enumerate)
@@ -369,10 +368,10 @@ std::vector<Face> groupSimilarVertices(const std::vector<Face>& faces, const std
  * @return
  */
 bool packCharts(
-    const std::vector<Vertex>& vertices,
+    const std::vector<Point3F>& vertices,
     const std::vector<Face>& faces,
     const std::vector<std::vector<size_t>>& charts,
-    std::vector<UVCoord>& uv_coords,
+    std::vector<Point2F>& uv_coords,
     uint32_t& texture_width,
     uint32_t& texture_height)
 {
@@ -382,7 +381,7 @@ bool packCharts(
     mesh.vertexUvData = uv_coords.data();
     mesh.indexData = faces.data();
     mesh.vertexCount = vertices.size();
-    mesh.vertexStride = sizeof(UVCoord);
+    mesh.vertexStride = sizeof(Point2F);
     mesh.indexCount = faces.size() * 3;
     mesh.indexFormat = xatlas::IndexFormat::UInt32;
 
@@ -419,14 +418,14 @@ bool packCharts(
     for (size_t i = 0; i < output_mesh.vertexCount; ++i)
     {
         const xatlas::PlacedVertex& vertex = output_mesh.vertexArray[i];
-        uv_coords[vertex.xref] = UVCoord{ .u = vertex.uv[0] / width, .v = vertex.uv[1] / height };
+        uv_coords[vertex.xref] = Point2F{ .x = vertex.uv[0] / width, .y = vertex.uv[1] / height };
     }
 
     xatlas::Destroy(atlas);
     return true;
 }
 
-bool smartUnwrap(const std::vector<Vertex>& vertices, const std::vector<Face>& faces, std::vector<UVCoord>& uv_coords, uint32_t& texture_width, uint32_t& texture_height)
+bool smartUnwrap(const std::vector<Point3F>& vertices, const std::vector<Face>& faces, std::vector<Point2F>& uv_coords, uint32_t& texture_width, uint32_t& texture_height)
 {
     // Make a first projection and grouping of the faces to UV coordinates
     std::vector<std::vector<size_t>> charts = makeCharts(vertices, faces, uv_coords);

@@ -92,6 +92,7 @@ class UvulaConan(ConanFile):
     def requirements(self):
         self.requires("spdlog/1.15.1")
         self.requires("range-v3/0.12.0")
+        self.requires("clipper/6.4.2@ultimaker/stable")
         if self.options.get_safe("with_python_bindings", False):
             self.requires("cpython/3.12.2")
             self.requires("pybind11/2.11.1")
