@@ -67,7 +67,7 @@ std::optional<std::vector<Point3F>> getBarycentricCoordinates(const Polygon& pol
     const double denom = d00 * d11 - d01 * d01;
 
     // Check if triangle is degenerate
-    constexpr double epsilon_triangle_cross_products = 0.000001;
+    constexpr double epsilon_triangle_cross_products = 0.001;
     if (std::abs(denom) < epsilon_triangle_cross_products)
     {
         return std::nullopt;
