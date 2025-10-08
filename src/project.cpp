@@ -52,7 +52,7 @@ Triangle2F projectToViewport(const Triangle3F& triangle, const Matrix44F& matrix
                        projectToViewport(triangle.p3(), matrix, is_camera_perspective, viewport_width, viewport_height) };
 }
 
-std::optional<std::vector<Point3F>> getBarycentricCoordinates(const Polygon& polygon, const Triangle2F& triangle)
+std::vector<Point3F> getBarycentricCoordinates(const Polygon& polygon, const Triangle2F& triangle)
 {
     // Calculate base vectors
     const Vector2F v0(triangle.p1, triangle.p2);
@@ -67,10 +67,10 @@ std::optional<std::vector<Point3F>> getBarycentricCoordinates(const Polygon& pol
     const double denom = d00 * d11 - d01 * d01;
 
     // Check if triangle is degenerate
-    constexpr double epsilon_triangle_cross_products = 0.000001;
+    constexpr double epsilon_triangle_cross_products = 0.001;
     if (std::abs(denom) < epsilon_triangle_cross_products)
     {
-        return std::nullopt;
+        return {};
     }
 
     std::vector<Point3F> result;
@@ -207,15 +207,15 @@ std::vector<Polygon> doProject(
         const Triangle2F face_uv = getFaceUv(mesh_uv, face);
         for (const Polygon& uv_area : uv_areas)
         {
-            const std::optional<std::vector<Point3F>> projected_stroke_polygon = getBarycentricCoordinates(uv_area, projected_face_triangle);
-            if (! projected_stroke_polygon.has_value())
+            const std::vector<Point3F> projected_stroke_polygon = getBarycentricCoordinates(uv_area, projected_face_triangle);
+            if (projected_stroke_polygon.empty())
             {
                 continue;
             }
 
             Polygon result_polygon;
-            result_polygon.reserve(projected_stroke_polygon.value().size());
-            for (const Point3F& point : projected_stroke_polygon.value())
+            result_polygon.reserve(projected_stroke_polygon.size());
+            for (const Point3F& point : projected_stroke_polygon)
             {
                 result_polygon.push_back(getTextureCoordinates(point, face_uv, texture_width, texture_height));
             }
