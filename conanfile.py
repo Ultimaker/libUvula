@@ -23,12 +23,14 @@ class UvulaConan(ConanFile):
     url = "https://github.com/Ultimaker/libUvula"
     homepage = "https://ultimaker.com"
     package_type = "library"
+    python_requires = "npmpackage/[>=1.0.0]"
     settings = "os", "arch", "compiler", "build_type"
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
         "enable_extensive_warnings": [True, False],
         "with_python_bindings": [True, False],
+        "with_js_bindings": [True, False],
         "with_cli": [True, False],
     }
     default_options = {
@@ -36,6 +38,7 @@ class UvulaConan(ConanFile):
         "fPIC": True,
         "enable_extensive_warnings": False,
         "with_python_bindings": True,
+        "with_js_bindings": False,
         "with_cli": False,
     }
 
@@ -66,12 +69,14 @@ class UvulaConan(ConanFile):
         copy(self, "*", os.path.join(self.recipe_folder, "include"),
              os.path.join(self.export_sources_folder, "include"))
         copy(self, "*", os.path.join(self.recipe_folder, "pyUvula"), os.path.join(self.export_sources_folder, "pyUvula"))
+        copy(self, "*", os.path.join(self.recipe_folder, "UvulaJS"), os.path.join(self.export_sources_folder, "UvulaJS"))
 
     def config_options(self):
         if self.settings.os == "Windows":
             del self.options.fPIC
         if self.settings.arch == "wasm" and self.settings.os == "Emscripten":
             del self.options.with_python_bindings
+            self.options.with_js_bindings = True
 
     def configure(self):
         if self.options.get_safe("with_python_bindings", False):
@@ -87,6 +92,11 @@ class UvulaConan(ConanFile):
         if self.options.get_safe("with_python_bindings", False):
             self.layouts.build.runenv_info.prepend_path("PYTHONPATH", "pyUvula")
             self.layouts.package.runenv_info.prepend_path("PYTHONPATH", os.path.join("lib", "pyUvula"))
+
+        if self.settings.os == "Emscripten":
+            self.cpp.build.bin = ["uvula_js.js"]
+            self.cpp.package.bin = ["uvula_js.js"]
+            self.cpp.build.bindirs += ["uvula_js"]
 
 
     def requirements(self):
@@ -125,6 +135,11 @@ class UvulaConan(ConanFile):
         if self.options.get_safe("with_python_bindings", False):
             tc.variables["PYUVULA_VERSION"] = self.version
 
+        if self.settings.arch == "wasm" and self.settings.os == "Emscripten":
+            tc.variables["WITH_JS_BINDINGS"] = True
+        else:
+            tc.variables["WITH_JS_BINDINGS"] = self.options.get_safe("with_js_bindings", False)
+
         tc.variables["WITH_CLI"] = self.options.get_safe("with_cli", False)
 
         if is_msvc(self):
@@ -150,9 +165,13 @@ class UvulaConan(ConanFile):
         cmake.configure()
         cmake.build()
 
+    def deploy(self):
+        copy(self, "uvula_js*", src=os.path.join(self.package_folder, "lib"), dst=self.deploy_folder)
+
     def package(self):
         copy(self, pattern="LICENSE", dst=os.path.join(self.package_folder, "licenses"), src=self.source_folder)
         copy(self, "*.pyd", src = os.path.join(self.build_folder, "pyUvula"), dst = os.path.join(self.package_folder, "lib", "pyUvula"), keep_path = False)
+        copy(self, pattern="uvula_js.*", src=os.path.join(self.build_folder, "UvulaJS"), dst=os.path.join(self.package_folder, "lib"))
         copy(self, f"*.d.ts", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path = False)
         copy(self, f"*.js", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path = False)
         packager = AutoPackager(self)
@@ -162,3 +181,6 @@ class UvulaConan(ConanFile):
         if self.options.get_safe("with_python_bindings", False):
             self.conf_info.define("user.uvula:pythonpath",
                                   os.path.join(self.package_folder, "lib", "pyUvula"))
+
+        if self.settings.os == "Emscripten":
+            self.python_requires["npmpackage"].module.conf_package_json(self)
