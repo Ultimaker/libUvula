@@ -1,4 +1,4 @@
-name: conan-package
+name: package
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
       - 'conanfile.py'
       - 'conandata.yml'
       - 'CMakeLists.txt'
-      - '.github/workflows/conan-package.yml'
+      - 'package.yml'
     branches:
       - main
       - master
