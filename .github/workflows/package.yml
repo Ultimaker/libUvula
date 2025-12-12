@@ -10,7 +10,7 @@ on:
       - 'conanfile.py'
       - 'conandata.yml'
       - 'CMakeLists.txt'
-      - 'package.yml'
+      - '.github/workflows/package.yml'
     branches:
       - main
       - master
