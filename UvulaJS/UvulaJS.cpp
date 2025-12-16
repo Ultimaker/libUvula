@@ -14,53 +14,75 @@
 
 using namespace emscripten;
 
-// Info structure for library version information
-struct uvula_info_t
+// TypeScript type aliases for better type safety
+EMSCRIPTEN_DECLARE_VAL_TYPE(Float32Array);
+EMSCRIPTEN_DECLARE_VAL_TYPE(Uint32Array);
+EMSCRIPTEN_DECLARE_VAL_TYPE(Int32Array);
+
+// Return type for unwrap function
+struct UnwrapResult
 {
-    std::string uvula_version;
-    std::string git_hash;
+    std::vector<float> uvCoordinates;
+    uint32_t textureWidth;
+    uint32_t textureHeight;
+};
+
+// Return type for project function (array of polygons as flat arrays)
+struct ProjectResult
+{
+    std::vector<std::vector<float>> polygons;
 };
 
 // Parameter structure for project function
 struct ProjectParams
 {
-    std::vector<float> strokePolygon;
-    std::vector<float> meshVertices;
-    std::vector<uint32_t> meshIndices;
-    std::vector<float> meshUV;
-    std::vector<int> meshFacesConnectivity;
-    uint32_t textureWidth;
-    uint32_t textureHeight;
-    std::vector<float> cameraProjectionMatrix;
-    bool isCameraPerspective;
-    uint32_t viewportWidth;
-    uint32_t viewportHeight;
-    std::vector<float> cameraNormal;
-    uint32_t faceId;
+    Float32Array strokePolygon = Float32Array{emscripten::val::array()};           // float[]
+    Float32Array meshVertices = Float32Array{emscripten::val::array()};            // float[]
+    Uint32Array meshIndices = Uint32Array{emscripten::val::array()};              // uint32_t[]
+    Float32Array meshUV = Float32Array{emscripten::val::array()};                  // float[]
+    Int32Array meshFacesConnectivity = Int32Array{emscripten::val::array()};     // int32_t[]
+    uint32_t textureWidth = 0;
+    uint32_t textureHeight = 0;
+    Float32Array cameraProjectionMatrix = Float32Array{emscripten::val::array()};  // float[16] - 4x4 matrix
+    bool isCameraPerspective = false;
+    uint32_t viewportWidth = 0;
+    uint32_t viewportHeight = 0;
+    Float32Array cameraNormal = Float32Array{emscripten::val::array()};            // float[3] - normal vector
+    uint32_t faceId = 0;
 };
 
-uvula_info_t get_uvula_info()
+std::string get_uvula_info()
 {
-    return { UVULA_VERSION, "" }; // Git hash can be added later if needed
+    return { UVULA_VERSION };
 }
 
 // Typed wrapper functions for better TypeScript generation
-emscripten::val unwrapTyped(const std::vector<float>& vertices, const std::vector<uint32_t>& indices)
+UnwrapResult unwrapTyped(const Float32Array& vertices_js, const Uint32Array& indices_js)
 {
-    // Convert flat arrays to Point3F and Face vectors
+    // Convert JavaScript arrays to C++ vectors
     std::vector<Point3F> vertex_points;
     std::vector<Face> face_indices;
-    
+
+    // Get array lengths
+    unsigned vertices_length = vertices_js["length"].as<unsigned>();
+    unsigned indices_length = indices_js["length"].as<unsigned>();
+
     // Convert vertices (expecting flat array of [x1, y1, z1, x2, y2, z2, ...])
-    vertex_points.reserve(vertices.size() / 3);
-    for (size_t i = 0; i < vertices.size(); i += 3) {
-        vertex_points.emplace_back(vertices[i], vertices[i + 1], vertices[i + 2]);
+    vertex_points.reserve(vertices_length / 3);
+    for (unsigned i = 0; i < vertices_length; i += 3) {
+        float x = vertices_js[i].as<float>();
+        float y = vertices_js[i + 1].as<float>();
+        float z = vertices_js[i + 2].as<float>();
+        vertex_points.emplace_back(x, y, z);
     }
 
     // Convert indices (expecting flat array of [i1, i2, i3, i4, i5, i6, ...])
-    face_indices.reserve(indices.size() / 3);
-    for (size_t i = 0; i < indices.size(); i += 3) {
-        face_indices.push_back({indices[i], indices[i + 1], indices[i + 2]});
+    face_indices.reserve(indices_length / 3);
+    for (unsigned i = 0; i < indices_length; i += 3) {
+        uint32_t i1 = indices_js[i].as<uint32_t>();
+        uint32_t i2 = indices_js[i + 1].as<uint32_t>();
+        uint32_t i3 = indices_js[i + 2].as<uint32_t>();
+        face_indices.push_back({i1, i2, i3});
     }
 
     // Prepare output
@@ -70,87 +92,107 @@ emscripten::val unwrapTyped(const std::vector<float>& vertices, const std::vecto
 
     // Perform unwrapping
     bool success = smartUnwrap(vertex_points, face_indices, uv_coords, texture_width, texture_height);
-    
+
     if (!success) {
         throw std::runtime_error("Couldn't unwrap UVs!");
     }
 
-    // Convert result to JavaScript object
-    emscripten::val result = emscripten::val::object();
+    // Convert result to structured return type
     std::vector<float> uv_array;
     uv_array.reserve(uv_coords.size() * 2);
-    
+
     for (const auto& coord : uv_coords) {
         uv_array.push_back(coord.x);
         uv_array.push_back(coord.y);
     }
-    
-    result.set("uvCoordinates", emscripten::val::array(uv_array));
-    result.set("textureWidth", texture_width);
-    result.set("textureHeight", texture_height);
-    
-    return result;
+
+    return UnwrapResult{
+        .uvCoordinates = uv_array,
+        .textureWidth = texture_width,
+        .textureHeight = texture_height
+    };
 }
 
-emscripten::val projectTyped(
-    const std::vector<float>& stroke_polygon,
-    const std::vector<float>& mesh_vertices,
-    const std::vector<uint32_t>& mesh_indices,
-    const std::vector<float>& mesh_uv,
-    const std::vector<int>& mesh_faces_connectivity,
+ProjectResult projectTyped(
+    const Float32Array& stroke_polygon_js,
+    const Float32Array& mesh_vertices_js,
+    const Uint32Array& mesh_indices_js,
+    const Float32Array& mesh_uv_js,
+    const Int32Array& mesh_faces_connectivity_js,
     uint32_t texture_width,
     uint32_t texture_height,
-    const std::vector<float>& camera_projection_matrix,
+    const Float32Array& camera_projection_matrix_js,
     bool is_camera_perspective,
     uint32_t viewport_width,
     uint32_t viewport_height,
-    const std::vector<float>& camera_normal,
+    const Float32Array& camera_normal_js,
     uint32_t face_id)
 {
-    // Convert stroke polygon
+    // Convert stroke polygon (flat array of [x1, y1, x2, y2, ...])
     std::vector<Point2F> stroke_points;
-    stroke_points.reserve(stroke_polygon.size() / 2);
-    for (size_t i = 0; i < stroke_polygon.size(); i += 2) {
-        stroke_points.push_back({stroke_polygon[i], stroke_polygon[i + 1]});
+    unsigned stroke_length = stroke_polygon_js["length"].as<unsigned>();
+    stroke_points.reserve(stroke_length / 2);
+    for (unsigned i = 0; i < stroke_length; i += 2) {
+        float x = stroke_polygon_js[i].as<float>();
+        float y = stroke_polygon_js[i + 1].as<float>();
+        stroke_points.push_back({x, y});
     }
 
-    // Convert mesh vertices
+    // Convert mesh vertices (flat array of [x1, y1, z1, x2, y2, z2, ...])
     std::vector<Point3F> vertex_points;
-    vertex_points.reserve(mesh_vertices.size() / 3);
-    for (size_t i = 0; i < mesh_vertices.size(); i += 3) {
-        vertex_points.emplace_back(mesh_vertices[i], mesh_vertices[i + 1], mesh_vertices[i + 2]);
+    unsigned vertices_length = mesh_vertices_js["length"].as<unsigned>();
+    vertex_points.reserve(vertices_length / 3);
+    for (unsigned i = 0; i < vertices_length; i += 3) {
+        float x = mesh_vertices_js[i].as<float>();
+        float y = mesh_vertices_js[i + 1].as<float>();
+        float z = mesh_vertices_js[i + 2].as<float>();
+        vertex_points.emplace_back(x, y, z);
     }
 
-    // Convert mesh indices
+    // Convert mesh indices (flat array of [i1, i2, i3, i4, i5, i6, ...])
     std::vector<Face> face_indices;
-    face_indices.reserve(mesh_indices.size() / 3);
-    for (size_t i = 0; i < mesh_indices.size(); i += 3) {
-        face_indices.push_back({mesh_indices[i], mesh_indices[i + 1], mesh_indices[i + 2]});
+    unsigned indices_length = mesh_indices_js["length"].as<unsigned>();
+    face_indices.reserve(indices_length / 3);
+    for (unsigned i = 0; i < indices_length; i += 3) {
+        uint32_t i1 = mesh_indices_js[i].as<uint32_t>();
+        uint32_t i2 = mesh_indices_js[i + 1].as<uint32_t>();
+        uint32_t i3 = mesh_indices_js[i + 2].as<uint32_t>();
+        face_indices.push_back({i1, i2, i3});
     }
 
-    // Convert mesh UV coordinates
+    // Convert mesh UV coordinates (flat array of [u1, v1, u2, v2, ...])
     std::vector<Point2F> uv_points;
-    uv_points.reserve(mesh_uv.size() / 2);
-    for (size_t i = 0; i < mesh_uv.size(); i += 2) {
-        uv_points.push_back({mesh_uv[i], mesh_uv[i + 1]});
+    unsigned uv_length = mesh_uv_js["length"].as<unsigned>();
+    uv_points.reserve(uv_length / 2);
+    for (unsigned i = 0; i < uv_length; i += 2) {
+        float u = mesh_uv_js[i].as<float>();
+        float v = mesh_uv_js[i + 1].as<float>();
+        uv_points.push_back({u, v});
     }
 
-    // Convert mesh faces connectivity
+    // Convert mesh faces connectivity (flat array of [f1, f2, f3, f4, f5, f6, ...])
     std::vector<FaceSigned> connectivity;
-    connectivity.reserve(mesh_faces_connectivity.size() / 3);
-    for (size_t i = 0; i < mesh_faces_connectivity.size(); i += 3) {
-        connectivity.push_back({mesh_faces_connectivity[i], mesh_faces_connectivity[i + 1], mesh_faces_connectivity[i + 2]});
+    unsigned connectivity_length = mesh_faces_connectivity_js["length"].as<unsigned>();
+    connectivity.reserve(connectivity_length / 3);
+    for (unsigned i = 0; i < connectivity_length; i += 3) {
+        int32_t i1 = mesh_faces_connectivity_js[i].as<int32_t>();
+        int32_t i2 = mesh_faces_connectivity_js[i + 1].as<int32_t>();
+        int32_t i3 = mesh_faces_connectivity_js[i + 2].as<int32_t>();
+        connectivity.push_back({i1, i2, i3});
     }
 
     // Convert camera projection matrix (4x4 matrix as flat array)
     float matrix_data[4][4];
     for (int i = 0; i < 16; ++i) {
-        matrix_data[i / 4][i % 4] = camera_projection_matrix[i];
+        matrix_data[i / 4][i % 4] = camera_projection_matrix_js[i].as<float>();
     }
     Matrix44F projection_matrix(matrix_data);
 
     // Convert camera normal (3-element array)
-    Vector3F normal(camera_normal[0], camera_normal[1], camera_normal[2]);
+    float normal_x = camera_normal_js[0].as<float>();
+    float normal_y = camera_normal_js[1].as<float>();
+    float normal_z = camera_normal_js[2].as<float>();
+    Vector3F normal(normal_x, normal_y, normal_z);
 
     // Call the projection function
     std::vector<Polygon> result = doProject(
@@ -169,24 +211,25 @@ emscripten::val projectTyped(
         face_id
     );
 
-    // Convert result to JavaScript array of arrays
-    emscripten::val js_result = emscripten::val::array();
-    for (size_t i = 0; i < result.size(); ++i) {
+    // Convert result to structured return type
+    std::vector<std::vector<float>> result_polygons;
+    result_polygons.reserve(result.size());
+
+    for (const auto& polygon : result) {
         std::vector<float> polygon_flat;
-        const Polygon& polygon = result[i];
         polygon_flat.reserve(polygon.size() * 2);
         for (const auto& point : polygon) {
             polygon_flat.push_back(point.x);
             polygon_flat.push_back(point.y);
         }
-        js_result.set(i, emscripten::val::array(polygon_flat));
+        result_polygons.push_back(std::move(polygon_flat));
     }
 
-    return js_result;
+    return ProjectResult{.polygons = result_polygons};
 }
 
 // Structured wrapper for project function using ProjectParams
-emscripten::val projectWithParams(const ProjectParams& params)
+ProjectResult projectWithParams(const ProjectParams& params)
 {
     return projectTyped(
         params.strokePolygon,
@@ -241,7 +284,7 @@ emscripten::val jsUnwrap(const emscripten::val& vertices_js, const emscripten::v
 
     // Perform unwrapping
     bool success = smartUnwrap(vertices, indices, uv_coords, texture_width, texture_height);
-    
+
     if (!success) {
         throw std::runtime_error("Couldn't unwrap UVs!");
     }
@@ -249,16 +292,16 @@ emscripten::val jsUnwrap(const emscripten::val& vertices_js, const emscripten::v
     // Convert result to JavaScript object
     emscripten::val result = emscripten::val::object();
     emscripten::val uv_array = emscripten::val::array();
-    
+
     for (size_t i = 0; i < uv_coords.size(); ++i) {
         uv_array.set(i * 2, uv_coords[i].x);
         uv_array.set(i * 2 + 1, uv_coords[i].y);
     }
-    
+
     result.set("uvCoordinates", uv_array);
     result.set("textureWidth", texture_width);
     result.set("textureHeight", texture_height);
-    
+
     return result;
 }
 
@@ -378,10 +421,23 @@ emscripten::val jsProject(
 
 EMSCRIPTEN_BINDINGS(uvula)
 {
-    // Register array types for better TypeScript generation
-    register_vector<float>("FloatArray");
-    register_vector<int>("IntArray");
-    register_vector<uint32_t>("UInt32Array");
+    // Register typed array types
+    register_vector<float>("Float32Array");
+    register_vector<std::vector<float>>("Float32ArrayArray");
+
+    // Register TypeScript-style typed arrays
+    emscripten::register_type<Float32Array>("Float32Array");
+    emscripten::register_type<Uint32Array>("Uint32Array");
+    emscripten::register_type<Int32Array>("Int32Array");
+
+    // Register structured return types
+    value_object<UnwrapResult>("UnwrapResult")
+        .field("uvCoordinates", &UnwrapResult::uvCoordinates)
+        .field("textureWidth", &UnwrapResult::textureWidth)
+        .field("textureHeight", &UnwrapResult::textureHeight);
+
+    value_object<ProjectResult>("ProjectResult")
+        .field("polygons", &ProjectResult::polygons);
 
     // Register ProjectParams structure
     value_object<ProjectParams>("ProjectParams")
@@ -402,11 +458,6 @@ EMSCRIPTEN_BINDINGS(uvula)
     // Main typed functions with proper TypeScript signatures
     function("unwrap", &unwrapTyped);
     function("project", &projectWithParams);
-
-    // Version information
-    value_object<uvula_info_t>("uvula_info_t")
-        .field("uvula_version", &uvula_info_t::uvula_version)
-        .field("git_hash", &uvula_info_t::git_hash);
 
     function("uvula_info", &get_uvula_info);
 
