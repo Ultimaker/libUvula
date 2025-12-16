@@ -19,10 +19,35 @@ EMSCRIPTEN_DECLARE_VAL_TYPE(Float32Array);
 EMSCRIPTEN_DECLARE_VAL_TYPE(Uint32Array);
 EMSCRIPTEN_DECLARE_VAL_TYPE(Int32Array);
 
+// Wrapper for array of Float32Array to provide proper TypeScript typing
+class PolygonArray {
+public:
+    emscripten::val polygons;
+    
+    PolygonArray() : polygons(emscripten::val::array()) {}
+    explicit PolygonArray(emscripten::val arr) : polygons(arr) {}
+    
+    void push(const Float32Array& polygon) {
+        polygons.call<void>("push", polygon);
+    }
+    
+    emscripten::val get(int index) const {
+        return polygons[index];
+    }
+    
+    int size() const {
+        return polygons["length"].as<int>();
+    }
+    
+    emscripten::val toArray() const {
+        return polygons;
+    }
+};
+
 // Return type for unwrap function
 struct UnwrapResult
 {
-    std::vector<float> uvCoordinates;
+    Float32Array uvCoordinates = Float32Array{emscripten::val::array()};
     uint32_t textureWidth;
     uint32_t textureHeight;
 };
@@ -30,7 +55,7 @@ struct UnwrapResult
 // Return type for project function (array of polygons as flat arrays)
 struct ProjectResult
 {
-    std::vector<std::vector<float>> polygons;
+    PolygonArray polygons;
 };
 
 // Parameter structure for project function
@@ -98,16 +123,15 @@ UnwrapResult unwrapTyped(const Float32Array& vertices_js, const Uint32Array& ind
     }
 
     // Convert result to structured return type
-    std::vector<float> uv_array;
-    uv_array.reserve(uv_coords.size() * 2);
+    emscripten::val uv_array = emscripten::val::array();
 
-    for (const auto& coord : uv_coords) {
-        uv_array.push_back(coord.x);
-        uv_array.push_back(coord.y);
+    for (size_t i = 0; i < uv_coords.size(); ++i) {
+        uv_array.set(i * 2, uv_coords[i].x);
+        uv_array.set(i * 2 + 1, uv_coords[i].y);
     }
 
     return UnwrapResult{
-        .uvCoordinates = uv_array,
+        .uvCoordinates = Float32Array{uv_array},
         .textureWidth = texture_width,
         .textureHeight = texture_height
     };
@@ -212,17 +236,17 @@ ProjectResult projectTyped(
     );
 
     // Convert result to structured return type
-    std::vector<std::vector<float>> result_polygons;
-    result_polygons.reserve(result.size());
+    PolygonArray result_polygons;
 
-    for (const auto& polygon : result) {
-        std::vector<float> polygon_flat;
-        polygon_flat.reserve(polygon.size() * 2);
-        for (const auto& point : polygon) {
-            polygon_flat.push_back(point.x);
-            polygon_flat.push_back(point.y);
+    for (size_t i = 0; i < result.size(); ++i) {
+        emscripten::val polygon_array = emscripten::val::array();
+        const auto& polygon = result[i];
+        for (size_t j = 0; j < polygon.size(); ++j) {
+            polygon_array.set(j * 2, polygon[j].x);
+            polygon_array.set(j * 2 + 1, polygon[j].y);
         }
-        result_polygons.push_back(std::move(polygon_flat));
+        // Add Float32Array to the result array
+        result_polygons.push(Float32Array{polygon_array});
     }
 
     return ProjectResult{.polygons = result_polygons};
@@ -421,14 +445,19 @@ emscripten::val jsProject(
 
 EMSCRIPTEN_BINDINGS(uvula)
 {
-    // Register typed array types
-    register_vector<float>("Float32Array");
-    register_vector<std::vector<float>>("Float32ArrayArray");
 
     // Register TypeScript-style typed arrays
     emscripten::register_type<Float32Array>("Float32Array");
     emscripten::register_type<Uint32Array>("Uint32Array");
     emscripten::register_type<Int32Array>("Int32Array");
+
+    // Register PolygonArray class for proper TypeScript typing
+    class_<PolygonArray>("PolygonArray")
+        .constructor<>()
+        .function("push", &PolygonArray::push)
+        .function("get", &PolygonArray::get)
+        .function("size", &PolygonArray::size)
+        .function("toArray", &PolygonArray::toArray);
 
     // Register structured return types
     value_object<UnwrapResult>("UnwrapResult")
