@@ -11,6 +11,7 @@ on:
       - 'conandata.yml'
       - 'CMakeLists.txt'
       - '.github/workflows/package.yml'
+      - 'UvulaJS/**'
     branches:
       - main
       - master
