@@ -181,7 +181,6 @@ class UvulaConan(ConanFile):
         copy(self, pattern="*.dll", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=True)
         copy(self, pattern="*.dylib", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=True)
 
-
     def package_info(self):
         if self.options.get_safe("with_python_bindings", False):
             self.conf_info.define("user.uvula:pythonpath",
