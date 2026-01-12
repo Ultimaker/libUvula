@@ -165,7 +165,7 @@ PolygonArray project(
     // Convert camera projection matrix (4x4 matrix as flat array)
     float matrix_data[4][4];
     for (int i = 0; i < 16; ++i) {
-        matrix_data[i / 4][i % 4] = camera_projection_matrix_js[i].as<float>();
+        matrix_data[i % 4][i / 4] = camera_projection_matrix_js[i].as<float>();
     }
     Matrix44F projection_matrix(matrix_data);
 
