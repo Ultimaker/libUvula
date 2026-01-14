@@ -78,8 +78,7 @@ UnwrapResult unwrap(const Float32Array& vertices_js, const Uint32Array& indices_
     }
 
     // Convert result to structured return type
-    emscripten::val uv_array = emscripten::val::array();
-
+    emscripten::val uv_array = emscripten::val::global("Float32Array").new_(uv_coords.size() * 2);
     for (size_t i = 0; i < uv_coords.size(); ++i)
     {
         uv_array.set(i * 2, uv_coords[i].x);
