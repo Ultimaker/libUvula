@@ -29,6 +29,57 @@ struct UnwrapResult
     uint32_t textureHeight;
 };
 
+struct Geometry
+{
+    std::vector<Point3F> vertices;
+    std::vector<Face> indices;
+    std::vector<Point2F> uvs;
+    std::vector<FaceSigned> connectivity;
+
+    Geometry(const Float32Array& vertices_js, const Uint32Array& indices_js, const Float32Array& uvs_js, const Int32Array& connectivity_js)
+    {
+        // Convert vertices
+        auto vertices_length = vertices_js["length"].as<int>();
+        vertices.reserve(vertices_length / 3);
+        for (int i = 0; i < vertices_length; i += 3) {
+            auto x = vertices_js[i].as<float>();
+            auto y = vertices_js[i + 1].as<float>();
+            auto z = vertices_js[i + 2].as<float>();
+            vertices.emplace_back(x, y, z);
+        }
+
+        // Convert indices
+        auto indices_length = indices_js["length"].as<int>();
+        indices.reserve(indices_length / 3);
+        for (int i = 0; i < indices_length; i += 3)
+        {
+            auto i1 = indices_js[i].as<uint32_t>();
+            auto i2 = indices_js[i + 1].as<uint32_t>();
+            auto i3 = indices_js[i + 2].as<uint32_t>();
+            indices.push_back({i1, i2, i3});
+        }
+
+        // Convert UVs
+        auto uvs_length = uvs_js["length"].as<int>();
+        uvs.reserve(uvs_length / 2);
+        for (int i = 0; i < uvs_length; i += 2) {
+            auto u = uvs_js[i].as<float>();
+            auto v = uvs_js[i + 1].as<float>();
+            uvs.emplace_back(u, v);
+        }
+
+        // Convert connectivity
+        auto connectivity_length = connectivity_js["length"].as<int>();
+        connectivity.reserve(connectivity_length / 3);
+        for (int i = 0; i < connectivity_length; i += 3) {
+            auto i1 = connectivity_js[i].as<int32_t>();
+            auto i2 = connectivity_js[i + 1].as<int32_t>();
+            auto i3 = connectivity_js[i + 2].as<int32_t>();
+            connectivity.push_back({i1, i2, i3});
+        }
+    }
+};
+
 std::string get_uvula_info()
 {
     return { UVULA_VERSION };
@@ -94,10 +145,7 @@ UnwrapResult unwrap(const Float32Array& vertices_js, const Uint32Array& indices_
 
 PolygonArray project(
     const Float32Array& stroke_polygon_js,
-    const Float32Array& mesh_vertices_js,
-    const Uint32Array& mesh_indices_js,
-    const Float32Array& mesh_uv_js,
-    const Int32Array& mesh_faces_connectivity_js,
+    Geometry& geometry,
     uint32_t texture_width,
     uint32_t texture_height,
     const Float32Array& camera_projection_matrix_js,
@@ -108,57 +156,13 @@ PolygonArray project(
     uint32_t face_id
 )
 {
-    // Convert stroke polygon (flat array of [x1, y1, x2, y2, ...])
     std::vector<Point2F> stroke_points;
-    unsigned stroke_length = stroke_polygon_js["length"].as<unsigned>();
+    auto stroke_length = stroke_polygon_js["length"].as<int>();
     stroke_points.reserve(stroke_length / 2);
-    for (unsigned i = 0; i < stroke_length; i += 2) {
-        float x = stroke_polygon_js[i].as<float>();
-        float y = stroke_polygon_js[i + 1].as<float>();
+    for (int i = 0; i < stroke_length; i += 2) {
+        auto x = stroke_polygon_js[i].as<float>();
+        auto y = stroke_polygon_js[i + 1].as<float>();
         stroke_points.push_back({x, y});
-    }
-
-    // Convert mesh vertices (flat array of [x1, y1, z1, x2, y2, z2, ...])
-    std::vector<Point3F> vertex_points;
-    unsigned vertices_length = mesh_vertices_js["length"].as<unsigned>();
-    vertex_points.reserve(vertices_length / 3);
-    for (unsigned i = 0; i < vertices_length; i += 3) {
-        float x = mesh_vertices_js[i].as<float>();
-        float y = mesh_vertices_js[i + 1].as<float>();
-        float z = mesh_vertices_js[i + 2].as<float>();
-        vertex_points.emplace_back(x, y, z);
-    }
-
-    // Convert mesh indices (flat array of [i1, i2, i3, i4, i5, i6, ...])
-    std::vector<Face> face_indices;
-    unsigned indices_length = mesh_indices_js["length"].as<unsigned>();
-    face_indices.reserve(indices_length / 3);
-    for (unsigned i = 0; i < indices_length; i += 3) {
-        uint32_t i1 = mesh_indices_js[i].as<uint32_t>();
-        uint32_t i2 = mesh_indices_js[i + 1].as<uint32_t>();
-        uint32_t i3 = mesh_indices_js[i + 2].as<uint32_t>();
-        face_indices.push_back({i1, i2, i3});
-    }
-
-    // Convert mesh UV coordinates (flat array of [u1, v1, u2, v2, ...])
-    std::vector<Point2F> uv_points;
-    unsigned uv_length = mesh_uv_js["length"].as<unsigned>();
-    uv_points.reserve(uv_length / 2);
-    for (unsigned i = 0; i < uv_length; i += 2) {
-        float u = mesh_uv_js[i].as<float>();
-        float v = mesh_uv_js[i + 1].as<float>();
-        uv_points.push_back({u, v});
-    }
-
-    // Convert mesh faces connectivity (flat array of [f1, f2, f3, f4, f5, f6, ...])
-    std::vector<FaceSigned> connectivity;
-    unsigned connectivity_length = mesh_faces_connectivity_js["length"].as<unsigned>();
-    connectivity.reserve(connectivity_length / 3);
-    for (unsigned i = 0; i < connectivity_length; i += 3) {
-        int32_t i1 = mesh_faces_connectivity_js[i].as<int32_t>();
-        int32_t i2 = mesh_faces_connectivity_js[i + 1].as<int32_t>();
-        int32_t i3 = mesh_faces_connectivity_js[i + 2].as<int32_t>();
-        connectivity.push_back({i1, i2, i3});
     }
 
     // Convert camera projection matrix (4x4 matrix as flat array)
@@ -171,10 +175,10 @@ PolygonArray project(
     // Call the projection function
     std::vector<Polygon> result = doProject(
         stroke_points,
-        vertex_points,
-        face_indices,
-        uv_points,
-        connectivity,
+        geometry.vertices,
+        geometry.indices,
+        geometry.uvs,
+        geometry.connectivity,
         texture_width,
         texture_height,
         projection_matrix,
@@ -222,6 +226,9 @@ EMSCRIPTEN_BINDINGS(uvula)
     function("project", &project);
 
     function("uvula_info", &get_uvula_info);
+
+    class_<Geometry>("Geometry")
+        .constructor<const Float32Array&, const Uint32Array&, const Float32Array&, const Int32Array&>();
 
     // Utility classes for direct access if needed
     class_<Point2F>("Point2F")
