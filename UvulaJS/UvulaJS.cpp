@@ -145,7 +145,7 @@ UnwrapResult unwrap(const Float32Array& vertices_js, const Uint32Array& indices_
 
 PolygonArray project(
     const Float32Array& stroke_polygon_js,
-    Geometry& geometry,
+    const Geometry& geometry,
     uint32_t texture_width,
     uint32_t texture_height,
     const Float32Array& camera_projection_matrix_js,
