@@ -65,19 +65,19 @@ py::list pyProject(
     const uint32_t face_id)
 {
     pybind11::buffer_info stroke_polygon_buffer = stroke_polygon_array.request();
-    const std::span<Point2F> stroke_polygon = std::span(static_cast<Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.shape[0]);
+    const std::span<const Point2F> stroke_polygon = std::span(static_cast<const Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.shape[0]);
 
     pybind11::buffer_info mesh_vertices_buffer = mesh_vertices_array.request();
-    const std::span<Point3F> mesh_vertices = std::span(static_cast<Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
+    const std::span<const Point3F> mesh_vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
 
     pybind11::buffer_info mesh_indices_buffer = mesh_indices_array.request();
-    const std::span<Face> mesh_indices = std::span(static_cast<Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
+    const std::span<const Face> mesh_indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
 
     pybind11::buffer_info mesh_uv_buffer = mesh_uv_array.request();
-    const std::span<Point2F> mesh_uv = std::span(static_cast<Point2F*>(mesh_uv_buffer.ptr), mesh_uv_buffer.shape[0]);
+    const std::span<const Point2F> mesh_uv = std::span(static_cast<const Point2F*>(mesh_uv_buffer.ptr), mesh_uv_buffer.shape[0]);
 
     pybind11::buffer_info mesh_faces_connectivity_buffer = mesh_faces_connectivity_array.request();
-    const std::span<FaceSigned> mesh_faces_connectivity = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
+    const std::span<const FaceSigned> mesh_faces_connectivity = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
 
     const pybind11::buffer_info camera_projection_matrix_buf = camera_projection_matrix_array.request();
     const Matrix44F camera_projection_matrix(*static_cast<float(*)[4][4]>(camera_projection_matrix_buf.ptr));

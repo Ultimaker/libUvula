@@ -34,10 +34,10 @@ using Polygon = std::vector<Point2F>;
  */
 std::vector<Polygon> doProject(
     const std::span<Point2F>& stroke_polygon,
-    const std::span<Point3F>& mesh_vertices,
-    const std::span<Face>& mesh_indices,
-    const std::span<Point2F>& mesh_uv,
-    const std::span<FaceSigned>& mesh_faces_connectivity,
+    const std::span<const Point3F>& mesh_vertices,
+    const std::span<const Face>& mesh_indices,
+    const std::span<const Point2F>& mesh_uv,
+    const std::span<const FaceSigned>& mesh_faces_connectivity,
     const uint32_t texture_width,
     const uint32_t texture_height,
     const Matrix44F& camera_projection_matrix,
