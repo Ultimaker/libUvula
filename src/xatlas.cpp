@@ -62,7 +62,11 @@ Copyright (c) 2012 Brandon Pelfrey
 #endif
 
 #ifndef XA_MULTITHREADED
+#ifdef __EMSCRIPTEN__
+#define XA_MULTITHREADED 0  // Disable threading for Emscripten/WASM
+#else
 #define XA_MULTITHREADED 1
+#endif
 #endif
 
 #define XA_STR(x) #x
@@ -1888,7 +1892,7 @@ public:
 
     TaskGroupHandle createTaskGroup(void* userData = nullptr, uint32_t reserveSize = 0)
     {
-        TaskGroup* group = XA_NEW(MemTag::Default, TaskGroup);
+        TaskGroup* group = XA_NEW(TaskGroup);
         group->queue.reserve(reserveSize);
         group->userData = userData;
         m_groups.push_back(group);
