@@ -65,7 +65,7 @@ py::list pyProject(
     const uint32_t face_id)
 {
     pybind11::buffer_info stroke_polygon_buffer = stroke_polygon_array.request();
-    const std::span<const Point2F> stroke_polygon = std::span(static_cast<const Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.shape[0]);
+    const std::span<Point2F> stroke_polygon = std::span(static_cast<Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.shape[0]);
 
     pybind11::buffer_info mesh_vertices_buffer = mesh_vertices_array.request();
     const std::span<const Point3F> mesh_vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
@@ -80,7 +80,7 @@ py::list pyProject(
     const std::span<const FaceSigned> mesh_faces_connectivity = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
 
     const pybind11::buffer_info camera_projection_matrix_buf = camera_projection_matrix_array.request();
-    const Matrix44F camera_projection_matrix(*static_cast<float(*)[4][4]>(camera_projection_matrix_buf.ptr));
+    const Matrix44F camera_projection_matrix(*static_cast<float (*)[4][4]>(camera_projection_matrix_buf.ptr));
 
     const pybind11::buffer_info camera_normal_buf = camera_normal_array.request();
     const float* camera_normal_ptr = static_cast<float*>(camera_normal_buf.ptr);
