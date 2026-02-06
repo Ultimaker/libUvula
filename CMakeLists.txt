@@ -35,6 +35,7 @@ set(UVULA_SRC
         src/Triangle3F.cpp
         src/Point3F.cpp
         src/geometry_utils.cpp
+        src/face_selection.cpp
 )
 add_library(libuvula STATIC ${UVULA_SRC})
 

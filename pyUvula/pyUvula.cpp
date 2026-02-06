@@ -2,6 +2,7 @@
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include "Face.h"
 #include "Matrix44F.h"
@@ -10,6 +11,7 @@
 #include "Vector3F.h"
 #include "project.h"
 #include "unwrap.h"
+#include "face_selection.h"
 
 namespace py = pybind11;
 
@@ -124,4 +126,102 @@ PYBIND11_MODULE(pyUvula, module)
 
     module.def("unwrap", &pyUnwrap, "Given the vertices, indices of a mesh, unwrap UV for texture-coordinates.");
     module.def("project", &pyProject, "Projects a stroke polygon into an object texture.");
+    
+    // Face selection functions for optimized paint tool
+    module.def("buildFaceNeighbors",
+          [](py::array_t<int32_t> indices) {
+              py::buffer_info idx_buf = indices.request();
+              
+              if (idx_buf.ndim != 1) throw std::runtime_error("indices must be 1D array");
+              
+              int32_t faceCount = static_cast<int32_t>(idx_buf.shape[0] / 3);
+              
+              std::vector<int32_t> neighbors = uvula::buildFaceNeighbors(
+                  static_cast<const int32_t*>(idx_buf.ptr),
+                  faceCount
+              );
+              
+              return py::array_t<int32_t>(neighbors.size(), neighbors.data());
+          },
+          "Build face neighbors array from mesh topology");
+    
+    module.def("getCoplanarConnectedFaces",
+          [](py::array_t<float> vertices,
+             py::array_t<int32_t> indices,
+             py::array_t<int32_t> faceNeighbors,
+             int32_t startFaceId,
+             float angleThreshold) {
+              py::buffer_info vert_buf = vertices.request();
+              py::buffer_info idx_buf = indices.request();
+              py::buffer_info neigh_buf = faceNeighbors.request();
+              
+              if (vert_buf.ndim != 1) throw std::runtime_error("vertices must be 1D array");
+              if (idx_buf.ndim != 1) throw std::runtime_error("indices must be 1D array");
+              if (neigh_buf.ndim != 1) throw std::runtime_error("faceNeighbors must be 1D array");
+              
+              return uvula::getCoplanarConnectedFaces(
+                  static_cast<const float*>(vert_buf.ptr),
+                  static_cast<const int32_t*>(idx_buf.ptr),
+                  static_cast<const int32_t*>(neigh_buf.ptr),
+                  startFaceId,
+                  angleThreshold
+              );
+          },
+          py::arg("vertices"),
+          py::arg("indices"),
+          py::arg("faceNeighbors"),
+          py::arg("startFaceId"),
+          py::arg("angleThreshold") = 0.99f,
+          "Find all connected faces that are coplanar with a starting face.");
+
+    module.def("getUvPolygonsForFaces",
+          [](py::list faceIds,
+             py::array_t<float> uvCoords,
+             py::array_t<int32_t> indices,
+             int32_t texWidth,
+             int32_t texHeight) {
+              std::vector<int32_t> faceIdsVec;
+              for (auto item : faceIds) {
+                  faceIdsVec.push_back(item.cast<int32_t>());
+              }
+              
+              py::buffer_info uv_buf = uvCoords.request();
+              py::buffer_info idx_buf = indices.request();
+              
+              std::vector<float> result = uvula::getUvPolygonsForFaces(
+                  faceIdsVec,
+                  static_cast<const float*>(uv_buf.ptr),
+                  static_cast<const int32_t*>(idx_buf.ptr),
+                  texWidth,
+                  texHeight
+              );
+              
+              return py::array_t<float>(result.size(), result.data());
+          },
+          py::arg("faceIds"),
+          py::arg("uvCoords"),
+          py::arg("indices"),
+          py::arg("texWidth"),
+          py::arg("texHeight"),
+          "Get UV coordinate polygons for a list of faces.");
+
+    module.def("computeFaceNormal",
+          [](py::array_t<float> vertices,
+             py::array_t<int32_t> indices,
+             int32_t faceId) {
+              py::buffer_info vert_buf = vertices.request();
+              py::buffer_info idx_buf = indices.request();
+              
+              std::vector<float> result = uvula::computeFaceNormal(
+                  static_cast<const float*>(vert_buf.ptr),
+                  static_cast<const int32_t*>(idx_buf.ptr),
+                  faceId
+              );
+              
+              return py::array_t<float>(result.size(), result.data());
+          },
+          py::arg("vertices"),
+          py::arg("indices"),
+          py::arg("faceId"),
+          "Compute the normal vector for a single face.");
 }
