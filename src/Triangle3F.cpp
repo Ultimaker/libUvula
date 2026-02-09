@@ -8,7 +8,7 @@ Triangle3F::Triangle3F(const Point3F& p1, const Point3F& p2, const Point3F& p3)
 {
 }
 
-Vector3F Triangle3F::normal() const
+std::optional<Vector3F> Triangle3F::normal() const
 {
-    return Vector3F(p1_, p2_).cross(Vector3F(p1_, p3_));
+    return Vector3F(p1_, p2_).cross(Vector3F(p1_, p3_)).normalized();
 }

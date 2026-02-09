@@ -46,3 +46,13 @@ std::vector<Polygon> doProject(
     const uint32_t viewport_height,
     const Vector3F& camera_normal,
     const uint32_t face_id);
+
+std::vector<Polygon> doGetConnectedFaces(
+    const std::span<const Point3F>& mesh_vertices,
+    const std::span<const Face>& mesh_indices,
+    const std::span<const Point2F>& mesh_uv,
+    const std::span<const FaceSigned>& mesh_faces_connectivity,
+    const uint32_t texture_width,
+    const uint32_t texture_height,
+    const uint32_t face_id,
+    const double threshold_angle);

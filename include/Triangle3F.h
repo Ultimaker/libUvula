@@ -25,7 +25,7 @@ public:
         return p3_;
     }
 
-    [[nodiscard]] Vector3F normal() const;
+    [[nodiscard]] std::optional<Vector3F> normal() const;
 
 private:
     Point3F p1_;
