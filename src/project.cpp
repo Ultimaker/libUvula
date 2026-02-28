@@ -18,17 +18,17 @@
 static constexpr float CLIPPER_PRECISION = 1000.0;
 
 
-Face getFace(const std::span<Face>& mesh_indices, const uint32_t face_index)
+Face getFace(const std::span<const Face>& mesh_indices, const uint32_t face_index)
 {
     return mesh_indices.empty() ? Face{ face_index * 3, face_index * 3 + 1, face_index * 3 + 2 } : mesh_indices[face_index];
 }
 
-Triangle3F getFaceTriangle(const std::span<Point3F>& mesh_vertices, const Face& face)
+Triangle3F getFaceTriangle(const std::span<const Point3F>& mesh_vertices, const Face& face)
 {
     return Triangle3F(mesh_vertices[face.i1], mesh_vertices[face.i2], mesh_vertices[face.i3]);
 }
 
-Triangle2F getFaceUv(const std::span<Point2F>& mesh_uv, const Face& face)
+Triangle2F getFaceUv(const std::span<const Point2F>& mesh_uv, const Face& face)
 {
     return Triangle2F{ mesh_uv[face.i1], mesh_uv[face.i2], mesh_uv[face.i3] };
 }
@@ -157,10 +157,10 @@ std::vector<Polygon> toPolygons(const ClipperLib::Paths& paths)
 
 std::vector<Polygon> doProject(
     const std::span<Point2F>& stroke_polygon,
-    const std::span<Point3F>& mesh_vertices,
-    const std::span<Face>& mesh_indices,
-    const std::span<Point2F>& mesh_uv,
-    const std::span<FaceSigned>& mesh_faces_connectivity,
+    const std::span<const Point3F>& mesh_vertices,
+    const std::span<const Face>& mesh_indices,
+    const std::span<const Point2F>& mesh_uv,
+    const std::span<const FaceSigned>& mesh_faces_connectivity,
     const uint32_t texture_width,
     const uint32_t texture_height,
     const Matrix44F& camera_projection_matrix,

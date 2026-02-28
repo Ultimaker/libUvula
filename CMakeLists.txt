@@ -14,6 +14,11 @@ if (WITH_PYTHON_BINDINGS)
     message(STATUS "Configuring pyUvula version: ${PYUVULA_VERSION}")
 endif ()
 
+option(WITH_JS_BINDINGS "Build with JavaScript/Emscripten bindings: `UvulaJS`" OFF)
+if (WITH_JS_BINDINGS)
+    message(STATUS "Configuring UvulaJS with Emscripten bindings")
+endif ()
+
 if (NOT DEFINED UVULA_VERSION)
     message(FATAL_ERROR "UVULA_VERSION is not defined!")
 endif ()
@@ -51,8 +56,14 @@ target_compile_definitions(libuvula
         UVULA_VERSION="${UVULA_VERSION}"
 )
 
-use_threads(libuvula)
-enable_sanitizers(libuvula)
+if(NOT EMSCRIPTEN)
+    use_threads(libuvula)
+endif()
+if(EMSCRIPTEN)
+    # Skip sanitizers and threading for Emscripten builds to avoid shared memory issues
+else()
+    enable_sanitizers(libuvula)
+endif()
 if (${EXTENSIVE_WARNINGS})
     set_project_warnings(libuvula)
 endif ()
@@ -60,6 +71,11 @@ endif ()
 # --- Setup Python bindings ---
 if (WITH_PYTHON_BINDINGS)
     add_subdirectory(pyUvula)
+endif ()
+
+# --- Setup JavaScript/Emscripten bindings ---
+if (WITH_JS_BINDINGS)
+    add_subdirectory(UvulaJS)
 endif ()
 
 # --- Setup command line interface (for testing purposes) ---
