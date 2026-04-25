@@ -19,6 +19,16 @@ cmake --build --preset conan-release
 
 The python bindings are built by default, but can be ignored by adding `-o with_python_bindings=False` when doing the setup with `conan`.
 
+### Installing via pip
+
+The Python binding can also be installed directly from source with pip (no prior Conan setup required — the build backend installs Conan transparently and fetches the C++ dependencies from conancenter):
+
+```bash
+pip install git+https://github.com/Ultimaker/libUvula.git
+```
+
+A C++20 compiler and CMake ≥ 3.23 must be available on the machine running the install.
+
 Once built, just make sure you have the library in the path and call the `unwrap` function:
 
 ```python

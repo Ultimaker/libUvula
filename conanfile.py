@@ -30,6 +30,7 @@ class UvulaConan(ConanFile):
         "fPIC": [True, False],
         "enable_extensive_warnings": [True, False],
         "with_python_bindings": [True, False],
+        "with_system_python": [True, False],
         "with_js_bindings": [True, False],
         "with_cli": [True, False],
     }
@@ -38,6 +39,7 @@ class UvulaConan(ConanFile):
         "fPIC": True,
         "enable_extensive_warnings": False,
         "with_python_bindings": True,
+        "with_system_python": False,
         "with_js_bindings": False,
         "with_cli": False,
     }
@@ -79,7 +81,7 @@ class UvulaConan(ConanFile):
             self.options.with_js_bindings = True
 
     def configure(self):
-        if self.options.get_safe("with_python_bindings", False):
+        if self.options.get_safe("with_python_bindings", False) and not self.options.get_safe("with_system_python", False):
             self.options["cpython"].shared = True
 
     def layout(self):
@@ -103,7 +105,7 @@ class UvulaConan(ConanFile):
         self.requires("spdlog/1.15.1")
         self.requires("range-v3/0.12.0")
         self.requires("clipper/6.4.2@ultimaker/stable")
-        if self.options.get_safe("with_python_bindings", False):
+        if self.options.get_safe("with_python_bindings", False) and not self.options.get_safe("with_system_python", False):
             self.requires("cpython/3.12.2")
             self.requires("pybind11/2.11.1")
         if self.options.get_safe("with_cli", False):

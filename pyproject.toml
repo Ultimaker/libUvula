@@ -1,0 +1,62 @@
+[build-system]
+requires = [
+    "scikit-build-core>=0.10",
+    "pybind11>=2.11,<3.0",
+    "conan>=2.7",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "pyUvula"
+version = "1.0.1"
+description = "UV-unwrapping library: normal-based face segmentation with xatlas chart packing."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "UltiMaker" }]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
+
+[project.urls]
+Homepage = "https://github.com/Ultimaker/libUvula"
+Source = "https://github.com/Ultimaker/libUvula"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+cmake.version = ">=3.23"
+cmake.build-type = "Release"
+cmake.args = ["-GNinja"]
+build.targets = ["pyUvula"]
+sdist.include = [
+    "CMakeLists.txt",
+    "conanfile.py",
+    "conanfile_pip.py",
+    "conandata.yml",
+    "include/**",
+    "src/**",
+    "pyUvula/**",
+    "LICENSE",
+    "README.md",
+]
+sdist.exclude = [
+    "UvulaJS",
+    "cli",
+    "demo.png",
+    ".github",
+]
+
+[tool.scikit-build.cmake.define]
+UVULA_PIP_BUILD = "ON"
+UVULA_VERSION = "1.0.1"
+PYUVULA_VERSION = "1.0.1"
+WITH_PYTHON_BINDINGS = "ON"
+WITH_JS_BINDINGS = "OFF"
+WITH_CLI = "OFF"
+EXTENSIVE_WARNINGS = "OFF"
