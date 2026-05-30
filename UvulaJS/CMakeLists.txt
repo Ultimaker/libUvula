@@ -1,6 +1,7 @@
 add_executable(uvula_js UvulaJS.cpp)
 target_link_options(uvula_js
         PUBLIC
+        "SHELL:-s ENVIRONMENT=web,worker,node"
         "SHELL:-s USE_ES6_IMPORT_META=1"
         "SHELL:-s FORCE_FILESYSTEM=1"
         "SHELL:-s EXPORT_NAME=uvula"
