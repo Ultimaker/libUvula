@@ -1,0 +1,164 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: account-api${SERVICE_SUFFIX}
+  annotations:
+    serving.knative.dev/route: account-api${SERVICE_SUFFIX}
+    run.googleapis.com/ingress: ${INGRESS}
+  labels:
+    service-name: account-api
+
+spec:
+  template:
+    metadata:
+      name: account-api${SERVICE_SUFFIX}${REVISION_SUFFIX}
+      annotations:
+        autoscaling.knative.dev/maxScale: '${MAX_SCALE}'
+        autoscaling.knative.dev/minScale: '${MIN_SCALE}'
+        run.googleapis.com/cpu-throttling: 'true'
+        run.googleapis.com/vpc-access-connector: projects/${GCP_PROJECT}/locations/${GCP_REGION}/connectors/um-cloud
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+      labels:
+        service-name: account-api
+    spec:
+      containerConcurrency: 20
+      timeoutSeconds: 300
+      serviceAccountName: account@${GCP_PROJECT}.iam.gserviceaccount.com
+      containers:
+        - name: stardust-account-api
+          image: ${IMAGE_URL}
+          ports:
+            - name: http1
+              containerPort: 8080
+          env:
+            - name: DATABASE_NAME
+              value: oauth2_server
+            - name: DATABASE_PROTOCOL
+              value: mongodb+srv
+            - name: DATABASE_PARAMETERS
+              value: ?retryWrites=true&w=majority&maxPoolSize=200
+            - name: DATABASE_CONNECTION_TIMEOUT_MS
+              value: "5000"
+            - name: SERVER_SELECTION_TIMEOUT_MS
+              value: "5000"
+            - name: HTTP_CLIENT_MAX_CLIENTS
+              value: '90'
+            - name: TRACING_ENABLED
+              value: 'false'
+            - name: APP_NAMESPACE
+              value: account
+            - name: APP_NAME
+              value: account
+
+            - name: ACCOUNT_TOTP_ISSUER
+              value: ${ACCOUNT_TOTP_ISSUER}
+            - name: ACCOUNT_TOKEN_ISSUER
+              value: ${ACCOUNT_TOKEN_ISSUER}
+
+            - name: ACCOUNT_EVENT_PUBSUB_TOPIC
+              value: account-events
+            - name: EMAIL_QUEUE_PUBSUB_TOPIC
+              value: send-mail-requests
+            - name: BULK_ACCOUNT_CREATION_PUBSUB_TOPIC
+              value: bulk-account-creation
+            - name: PUBSUB_VERIFICATION_TOKEN
+              value: ${PUBSUB_VERIFICATION_TOKEN}
+            - name: RIGHT_SIGNATURE_WEBHOOK_VALIDATION
+              value: ${RIGHT_SIGNATURE_WEBHOOK_VALIDATION}
+
+            - name: FRONT_END_PROXY_HOST
+              value: ${FRONT_END_PROXY_HOST}
+            - name: ACCOUNT_URL
+              value: ${ACCOUNT_URL}
+            - name: DIGITAL_FACTORY_URL
+              value: ${DIGITAL_FACTORY_URL}
+            - name: REPORT_API_URL
+              value: ${REPORT_API_URL}
+            - name: MARKETPLACE_URL
+              value: ${MARKETPLACE_URL}
+            - name: ULTIMAKER_PROVISIONING_API_URL
+              value: ${ULTIMAKER_PROVISIONING_API_URL}
+            - name: CLOUD_API_URL
+              value: ${CLOUD_API_URL}
+            - name: CONNECT_API_URL
+              value: ${CONNECT_API_URL}
+
+            - name: BUCKET_NAME_BULK_ACCOUNT_CREATION
+              value: ${BUCKET_NAME_BULK_ACCOUNT_CREATION}
+            - name: BUCKET_NAME_TEAM_IMAGES
+              value: ${BUCKET_NAME_TEAM_IMAGES}
+            - name: BUCKET_NAME_PROFILE_IMAGES
+              value: ${BUCKET_NAME_PROFILE_IMAGES}
+            - name: BUCKET_NAME_ORGANIZATION_IMAGES
+              value: ${BUCKET_NAME_ORGANIZATION_IMAGES}
+
+            - name: DEMO_PROJECT_DOCUMENT_URL
+              value: ${DEMO_PROJECT_DOCUMENT_URL}
+            - name: DEMO_PROJECT_IMAGE_URL
+              value: ${DEMO_PROJECT_IMAGE_URL}
+
+            - name: MONGO_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: account-mongodb
+            - name: ACCOUNT_FEDERATION_SEED
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: account-account_federation_seed
+            - name: COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: account-cookie_secret
+            - name: JWT_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: jwt-private-key
+            - name: JWT_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: jwt-public-key
+            - name: SALESFORCE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: salesforce-config
+            - name: ZENDESK_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: account-zendesk_credentials
+            - name: NOTIFICATIONS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: notifications-account-api-key
+            - name: SUBSCRIPTIONS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: account-subscriptions-api-key
+            - name: BETA_FEATURES
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: account-alpha_features
+            - name: RIGHT_SIGNATURE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: rightsignature_token
+            - name: MONGO_CONFIGS
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: account-mongodb-global
+
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 256Mi

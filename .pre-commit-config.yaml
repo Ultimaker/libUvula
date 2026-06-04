@@ -1,0 +1,66 @@
+# pre-commit configuration for libUvula
+default_stages: [commit]
+
+repos:
+  - repo: https://github.com/thoughtworks/talisman
+    rev: v1.32.0
+    hooks:
+      - id: talisman-commit
+
+  - repo: local
+    hooks:
+      - id: check-yaml
+        name: Check YAML Syntax
+        entry: |-
+          bash -c 'if [ "$SKIP_PRE_COMMIT" = "1" ]; then exit 0; fi; exec python3 -c "
+          import sys
+          try:
+              import yaml
+              [yaml.safe_load(open(f)) for f in sys.argv[1:]]
+          except ImportError:
+              print(\"WARNING: PyYAML not found. Skipping YAML syntax check.\")
+          " "$@"' --
+        language: system
+        files: \.(yaml|yml)$
+
+      - id: check-json
+        name: Check JSON Syntax
+        entry: >-
+          bash -c 'if [ "$SKIP_PRE_COMMIT" = "1" ]; then exit 0; fi; exec python3 -c "import json, sys; [json.load(open(f)) for f in sys.argv[1:]]" "$@"' --
+        language: system
+        files: \.json$
+
+      - id: check-agent-artifacts
+        name: Check for Agent Artifacts
+        entry: >-
+          bash -c 'if [ "$SKIP_PRE_COMMIT" = "1" ]; then exit 0; fi; for f in "$@"; do if [[ "$f" =~ (task(_.*)?\.md|task\..*|implementation_plan(_.*)?\.md|implementation_plan\..*|walkthrough(_.*)?\.md|walkthrough\..*|\.playwright-cli|__pycache__|scratch_.*|scratch\..*|temp_.*|temp\..*|test_scratch_.*|test_scratch\..*|test_agent_.*|test_agent\..*|test_temp_.*|test_temp\..*|test_run_.*|test_run\..*|test_debug_.*|test_debug\..*|test_mock_.*|test_mock\..*|test_quick_.*|test_quick\..*|test_sandbox_.*|test_sandbox\..*|test_test_.*|test_test\..*|^test_[^/]+\.(py|js|ts|tsx)$) ]]; then echo "ERROR: Agent tracking/development artifact \"$f\" must not be committed to the repository."; exit 1; fi; done' --
+        language: system
+
+      - id: clang-format
+        name: Format C++ Code (clang-format)
+        entry: >-
+          bash -c 'if [ "$SKIP_PRE_COMMIT" = "1" ]; then exit 0; fi; if ! command -v clang-format &>/dev/null; then echo "WARNING: clang-format not found. Skipping formatting."; exit 0; fi; exec clang-format -i "$@"' --
+        language: system
+        files: \.(cpp|h|hpp)$
+
+      - id: cppcheck
+        name: Fast Static Analysis (cppcheck)
+        entry: >-
+          bash -c 'if [ "$SKIP_PRE_COMMIT" = "1" ]; then exit 0; fi; if ! command -v cppcheck &>/dev/null; then echo "WARNING: cppcheck not found. Skipping static analysis."; exit 0; fi; exec cppcheck --enable=warning,performance,portability --inline-suppr --suppress=missingIncludeSystem --quiet "$@"' --
+        language: system
+        files: \.(cpp|h|hpp)$
+
+      - id: check-local-paths
+        name: Check for Local Path References
+        entry: >-
+          bash -c 'if [ "$SKIP_PRE_COMMIT" = "1" ]; then exit 0; fi; if [ -n "$HOME" ] && grep -FIn "$HOME" "$@" >/dev/stderr; then echo "ERROR: Staged files contain references to your local home directory ($HOME). Please use relative paths instead."; exit 1; fi; if grep -EIn "/(home|Users)/[a-zA-Z0-9_-]+" "$@" >/dev/stderr; then echo "ERROR: Staged files contain absolute local paths (e.g., /home/USER/ or /Users/USER/). Please use relative paths instead."; exit 1; fi' --
+        language: system
+        files: \.(py|js|jsx|ts|tsx|sh|bash|md|cpp|h|hpp|txt|cmake|yml|yaml)$
+        exclude: ^(\.agents/|\.pre-commit-config\.yaml)
+
+      - id: check-jira-ticket
+        name: Check Jira Ticket in Commit Message
+        entry: >-
+          bash -c 'if [ "$SKIP_PRE_COMMIT" = "1" ]; then exit 0; fi; if ! grep -Ei "(EMB|CES|COL|STYX|UC|NP)-[0-9]+" "$1" >/dev/null; then echo "ERROR: Commit message must reference a valid Jira ticket from authorized projects (e.g., EMB-XXXX, CES-XXXX, COL-XXXX, STYX-XXXX, UC-XXXX, NP-XXXX)."; exit 1; fi' --
+        language: system
+        stages: [commit-msg]

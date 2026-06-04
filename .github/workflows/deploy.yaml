@@ -1,0 +1,53 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - Build
+    branches:
+      - staging
+      - main
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment: ${{ github.event.workflow_run.head_branch == 'main' && 'production' || 'staging' }}
+    strategy:
+      matrix:
+        service:
+          - frontend
+          - api
+          - worker
+        region:
+          - short: eu
+            full: europe-west1
+          - short: us
+            full: us-east1
+        include:
+          - service: worker
+            region:
+              short: us-geo
+              full: us-east1
+    name: Deploy ${{ matrix.service }} (${{ matrix.region.short }})
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.INFRA_WI_PROVIDER }}
+      - name: Create YAML from Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          cd helm
+          helm template cloudrun -s templates/${{ matrix.service }}.yaml -f values-${{ vars.ENV_NAME }}.yaml -f values-${{ matrix.region.short }}.yaml --set gitSHA=${{ github.sha }} --set imageTag=${{ vars.ENV_NAME == 'production' && 'latest' || 'staging' }} . > ../deployment.yaml
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          region: ${{ matrix.region.full }}
+          metadata: deployment.yaml

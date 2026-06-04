@@ -63,7 +63,7 @@ Copyright (c) 2012 Brandon Pelfrey
 
 #ifndef XA_MULTITHREADED
 #ifdef __EMSCRIPTEN__
-#define XA_MULTITHREADED 0  // Disable threading for Emscripten/WASM
+#define XA_MULTITHREADED 0 // Disable threading for Emscripten/WASM
 #else
 #define XA_MULTITHREADED 1
 #endif

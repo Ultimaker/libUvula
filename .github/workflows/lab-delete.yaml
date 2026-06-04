@@ -1,0 +1,33 @@
+---
+name: Delete lab
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  delete-lab:
+    name: Delete ${{ matrix.service }}
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - account-api
+          - account-worker
+          - account-frontend
+        include:
+          - service: account-api
+            share-url: true
+          - service: account-worker
+            share-url: false
+          - service: account-frontend
+            share-url: false
+    uses: Ultimaker/stardust-workflows/.github/workflows/lab-delete.yaml@master
+    with:
+      service: ${{ matrix.service }}
+      share-url: ${{ matrix.share-url }}
+    secrets: inherit

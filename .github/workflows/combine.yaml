@@ -1,0 +1,8 @@
+---
+name: "Combine Dependabot PRs"
+on:
+  workflow_dispatch:  # can be run manually via github actions
+
+jobs:
+  combine-prs:
+    uses: Ultimaker/stardust-workflows/.github/workflows/services-combine.yaml@master

@@ -1,0 +1,28 @@
+fileignoreconfig:
+- filename: .github/services/lab.env
+  checksum: c0b8bb3533008b27bc59c6713156b079dfde3c0a7d28cd5d8642876e92bd905a
+- filename: .github/services/production.env
+  checksum: 6723cd733b3d8f6b99096f8a2362d2bc2e828661b76d8338dd432097b80277b1
+- filename: .github/services/staging.env
+  checksum: 5c500ea4e0fdd54d151a34b706333075f6c2ff7acc7d585a76f263658067fc26
+- filename: .github/copilot-instructions.md
+  checksum: e81cac7a8100a919eea6a20b8e00119cfa75490a42fe170547b4ae84fe85fc51
+- filename: .github/copilot-instructions/accessibility-auditor.instructions.md
+  checksum: c40fcf19e1ae5ac15e21046c3f2682ee7381b0f2d68af46e345bdcdc373cc0d9
+- filename: .github/workflows/lab-deploy.yaml
+  checksum: e11975b55ee53835adb3ca83477d91aad472454172db4059608d957ce2434805
+- filename: .github/copilot-instructions/code-reviewer.instructions.md
+  checksum: 90949bb7f79167b10c12be61fc8293e3deba60dfafa0d72c4bb023ea45c8961f
+- filename: .github/dependabot.yml
+  checksum: f6f8c58bfaac2bcb17410e314bbb82bd4a50393979671602ca65b1d86da2b1e7
+- filename: .github/copilot-instructions/testing-automation.instructions.md
+  checksum: d1c4fc9b8579d5a7648e0d3d9076410d97fe25031f558b500b0eccecd258e0da
+- filename: .github/workflows/lab-delete.yaml
+  checksum: b43d0f6190c0f90c567d7dc7d6e30c9c72104b9df246d49912110616ee03bb4a
+- filename: .github/workflows/pull-request.yaml
+  checksum: 65313710db6d09de8e5829f08e13a4b97beb6eb1b5b5f1a249bbc335314c2e35
+- filename: .github/copilot-instructions/pr-assistant.instructions.md
+  checksum: 8cd77d9648f41bed3e8f94ba6101f3854916f82b78c192e9954873e3d7f722bb
+- filename: AGENTS.md
+  checksum: 816697c4844623e775585da1c2ce7eca21f5c34a881db0bfae2833c80069ced7
+version: ""
