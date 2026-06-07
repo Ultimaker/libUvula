@@ -63,7 +63,7 @@ std::vector<Vector3F> calculateProjectionNormals(const std::vector<FaceData>& fa
     };
 
     // The unprocessed_faces is a sub-range of the faces list, that contains all the faces that have not been assigned to a group yet.
-    FaceDataRange unprocessed_faces = { .begin = faces_to_process.begin(), .end = faces_to_process.end() };
+    FaceDataRange unprocessed_faces = { .begin = std::next(faces_to_process.begin()), .end = faces_to_process.end() };
 
     while (true)
     {
@@ -85,7 +85,7 @@ std::vector<Vector3F> calculateProjectionNormals(const std::vector<FaceData>& fa
         Vector3F summed_normals = std::accumulate(
             current_faces_group.begin,
             current_faces_group.end,
-            Vector3F(),
+            *project_normal,
             [](const Vector3F& normal, const FaceData* face_data)
             {
                 return normal + face_data->normal;
