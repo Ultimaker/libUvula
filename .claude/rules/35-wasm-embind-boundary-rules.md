@@ -1,0 +1,1 @@
+../../.agents/rules/35-wasm-embind-boundary-rules.md

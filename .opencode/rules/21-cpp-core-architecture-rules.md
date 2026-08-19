@@ -1,0 +1,1 @@
+../../.agents/rules/21-cpp-core-architecture-rules.md

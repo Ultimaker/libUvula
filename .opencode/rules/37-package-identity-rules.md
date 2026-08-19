@@ -1,0 +1,1 @@
+../../.agents/rules/37-package-identity-rules.md

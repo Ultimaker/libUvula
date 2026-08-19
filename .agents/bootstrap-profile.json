@@ -1,0 +1,390 @@
+{
+  "repository": {
+    "name": "libUvula",
+    "source": "git-remote:origin"
+  },
+  "stacks": {
+    "has_frontend": false,
+    "has_cloud": false,
+    "has_cpp": true,
+    "has_infra": false,
+    "has_qml": false,
+    "has_freertos": false,
+    "has_debian": false,
+    "has_materials": false
+  },
+  "git": {
+    "commits_sampled": 92,
+    "jira_keys": {
+      "UC": 12
+    },
+    "allowed_jira_keys": [
+      "UC"
+    ],
+    "branch_jira_key": "UC",
+    "history_jira_key": "UC",
+    "dominant_jira_key": "UC",
+    "semantic_prefix_ratio": 0.0
+  },
+  "base_branch": "main",
+  "submodules": [],
+  "ci": {
+    "providers": [
+      "github-actions"
+    ],
+    "workflows": [
+      ".github/workflows/package.yml"
+    ],
+    "signals": {
+      "tests": false,
+      "lint": false,
+      "build": true
+    }
+  },
+  "tests": {
+    "frameworks": [],
+    "commands": []
+  },
+  "linters": {
+    "ruff": false,
+    "black": false,
+    "flake8": false,
+    "mypy": false,
+    "eslint": false,
+    "prettier": false,
+    "stylelint": false,
+    "clang_format": true,
+    "clang_tidy": true,
+    "pre_commit_config": false
+  },
+  "lint_scripts": [],
+  "protected_branches": [
+    "main"
+  ],
+  "cpp": {
+    "sampled_files": 26,
+    "expected_hits": 0,
+    "throw_hits": 3,
+    "error_style": "exceptions",
+    "cxx_standard": null,
+    "idioms": {
+      "ranges": 7,
+      "constexpr": 9,
+      "concepts": 0,
+      "auto": 37,
+      "unique_ptr": 0,
+      "shared_ptr": 0,
+      "raw_new": 3,
+      "raw_delete": 6,
+      "optional": 5,
+      "variant": 0,
+      "coroutines": 0
+    },
+    "auto_per_file": 1.4,
+    "has_wasm": true,
+    "conan_major": 2,
+    "conan_version_req": ">=2.7.0"
+  },
+  "c": {},
+  "python": {},
+  "ui": {
+    "has_ui": false,
+    "design_md_exists": false,
+    "token_sources": [],
+    "uses_stardust": false
+  },
+  "pr_template": {
+    "exists": true,
+    "path": ".github/PULL_REQUEST_TEMPLATE.md",
+    "has_why": true,
+    "has_what": false,
+    "has_how": false,
+    "content": "Jira ticket: UC-XXX\n\n-   [ ] Describe the changes that were made and why\n-   [ ] Add screenshot\n-   [ ] Unit tests\n-   [ ] E2E tests\n"
+  },
+  "build_commands": [
+    "cmake --build build",
+    "conan build ."
+  ],
+  "directory_map": [
+    {
+      "name": "include",
+      "count": 13,
+      "extensions": ".h"
+    },
+    {
+      "name": "src",
+      "count": 10,
+      "extensions": ".cpp"
+    },
+    {
+      "name": "UvulaJS",
+      "count": 2,
+      "extensions": ".txt, .cpp"
+    },
+    {
+      "name": "cli",
+      "count": 2,
+      "extensions": ".txt, .cpp"
+    },
+    {
+      "name": "pyUvula",
+      "count": 2,
+      "extensions": ".txt, .cpp"
+    }
+  ],
+  "artifact_dirs": [],
+  "has_api_surface": false,
+  "interface_dirs": [],
+  "api_doc_paths": [],
+  "has_storybook": false,
+  "host": {
+    "os": "linux",
+    "has_secret_tool": true,
+    "has_security": false
+  },
+  "vendored": [],
+  "generated": [],
+  "evidence": {
+    "has_systemd": false,
+    "systemd_units": [],
+    "has_udev": false,
+    "udev_rules": [],
+    "has_dbus": false,
+    "dbus_policy": [],
+    "has_machine_json": false,
+    "machine_json_files": [],
+    "has_gcode": false,
+    "gcode_evidence": [],
+    "has_po_files": false,
+    "po_files": [],
+    "has_debian_packaging": false,
+    "debian_evidence": [],
+    "shell_script_count": 0
+  },
+  "license": {
+    "declared": "GNU GENERAL PUBLIC",
+    "source": "LICENSE",
+    "proprietary": false
+  },
+  "has_package_json": false,
+  "node_package_dirs": [],
+  "python_packaging_manifests": [],
+  "file_count": 39,
+  "complexity": {
+    "functions_sampled": 309,
+    "median": 1,
+    "p90": 6,
+    "max": 80
+  },
+  "skills": {
+    "catalog_root": "~/dev/um/UltiCortex",
+    "catalog_size": 28,
+    "matched": [
+      "conan-2",
+      "cmake",
+      "cpp-pro",
+      "software-architect"
+    ]
+  },
+  "observations": [
+    {
+      "category": "commit-style",
+      "title": "Commit messages carry explanatory bodies",
+      "evidence": [
+        "79% of sampled commits have a body",
+        "average body length 1.5 lines"
+      ],
+      "question": "Should agents be required to write a body explaining why/how, not just a subject line?",
+      "draft_rule": "Every commit message MUST include a body explaining why the change was needed and how it works \u2014 a subject line alone is not enough.",
+      "confidence": "high",
+      "data": {}
+    },
+    {
+      "category": "ecosystem_contract",
+      "title": "A WebAssembly/embind boundary crosses out of this repository",
+      "evidence": [
+        "`UvulaJS/CMakeLists.txt`",
+        "`UvulaJS/UvulaJS.cpp`",
+        "`src/xatlas.cpp`"
+      ],
+      "question": "Which link options and exported symbols are a published contract with the JavaScript consumer, and which are build trivia? Which consumer bundler configuration depends on them, and is any generated TypeScript surface (`.d.ts`, a generated registry) typechecked by anything at all?",
+      "draft_rule": "The Emscripten link options in `<file>` are a contract with `<consumer repo>`'s bundler, not a build detail: `<contractual flags>` determine how the module is imported and must not change without naming the consumer impact in the PR. WASM-specific code stays in `<wasm dir>`; the core must build natively unchanged. Every exported binding is a public API change. Relevant catalogue skills: `ultimaker-curator-development`, `ultimaker-neoprep-development`.",
+      "confidence": "high",
+      "data": {
+        "surface": "wasm_boundary",
+        "files": [
+          "UvulaJS/CMakeLists.txt",
+          "UvulaJS/UvulaJS.cpp",
+          "src/xatlas.cpp"
+        ],
+        "skills": [
+          "ultimaker-curator-development",
+          "ultimaker-neoprep-development"
+        ]
+      }
+    },
+    {
+      "category": "ecosystem_contract",
+      "title": "This repository's public surface is mounted into other repositories",
+      "evidence": [
+        "no entry point starts a process here, yet the repository publishes a surface (`include/`)",
+        "published surface: `include/`"
+      ],
+      "question": "Which consumers pin this repository, and what is the ordering discipline for a change that spans both trees? Rule 34 states the part that is provable from this tree; the rest belongs here.",
+      "draft_rule": "Every exported symbol, model field and schema in the published surface is a contract with the repositories that mount it. Land the change here first, then move each consumer's pointer; prefer additive shape changes and name the consumers in the pull request.",
+      "confidence": "high",
+      "data": {
+        "surface": "library_consumer_contract",
+        "consumers": [],
+        "surface_dirs": [
+          "include"
+        ],
+        "manifests": [
+          "conanfile.py"
+        ],
+        "has_entry_point": false,
+        "nested_checkout": false,
+        "paths": [
+          "include/**"
+        ],
+        "reasons": [
+          "no entry point starts a process here, yet the repository publishes a surface (`include/`)"
+        ]
+      }
+    },
+    {
+      "category": "code-pattern",
+      "title": "Observed file-size distribution (input to the ratchet)",
+      "evidence": [
+        "median 35 lines, 90th percentile 246, largest sampled 3877",
+        "2 of 27 sampled files exceed the 400-line budget and will be grandfathered at their current size"
+      ],
+      "question": "The file-size ratchet is already generated as a managed rule (`10-file-size-and-decomposition-rules.md`) with a 400-line budget. Is 400 the right budget for this codebase, or does its shape justify a different number (90th percentile is 246)? Re-run the bootstrap with `--file-size-budget N` to change it \u2014 do not write a competing rule.",
+      "draft_rule": "No new rule needed: adjust the managed budget instead. Consider whether the largest grandfathered files deserve a decomposition ticket of their own.",
+      "confidence": "medium",
+      "data": {
+        "median": 35,
+        "p90": 246,
+        "largest": 3877,
+        "over_budget": 2
+      }
+    },
+    {
+      "category": "commit-style",
+      "title": "Commits are small and tightly scoped",
+      "evidence": [
+        "median 1 files per commit, 90th percentile 24"
+      ],
+      "question": "Should the scope rule name a concrete file-count expectation derived from this repository's own history?",
+      "draft_rule": "Keep commits tightly scoped: this repository's median commit touches 1 files. A commit touching more than 24 files needs an explicit justification in the message.",
+      "confidence": "medium",
+      "data": {}
+    },
+    {
+      "category": "ecosystem_contract",
+      "title": "This repository publishes a package whose identity is generated, not committed",
+      "evidence": [
+        "`conanfile.py`",
+        "`.github/workflows/package.yml`"
+      ],
+      "question": "What is the published artifact called, who consumes it, and where does its version string actually come from? A repository whose package metadata is generated at packaging time has no committed manifest for a detector to read \u2014 the identity has to be traced through the recipe.",
+      "draft_rule": "The published artifact is `<package name>`, assembled by `<mechanism>`; `<file>` is the single source of truth for its identity, version and exports. Never hand-write a competing manifest. Consumers (`<consumer repos>`) pin exact versions \u2014 a breaking change to the exported surface requires the paired consumer PR in the same ticket. Relevant catalogue skills: `conan-2`.",
+      "confidence": "medium",
+      "data": {
+        "surface": "package_publishing",
+        "files": [
+          "conanfile.py",
+          ".github/workflows/package.yml"
+        ],
+        "skills": [
+          "conan-2"
+        ]
+      }
+    },
+    {
+      "category": "git-workflow",
+      "title": "History keeps merge commits",
+      "evidence": [
+        "17/91 sampled commits are merges (mostly pull request merges)",
+        "`Merge pull request`: 8, `Merge branch`: 5"
+      ],
+      "question": "Is the merge commit intentional (preserving branch topology), and should agents therefore NOT rebase published branches?",
+      "draft_rule": "This repository preserves merge topology. Do not rewrite or rebase branches that have already been pushed; integrate with merges.",
+      "confidence": "medium",
+      "data": {}
+    },
+    {
+      "category": "code-pattern",
+      "title": "File names are predominantly PascalCase",
+      "evidence": [
+        "{'PascalCase': 16, 'snake_case': 2, 'camelCase': 1} across 19 multi-word file names"
+      ],
+      "question": "Does the convention differ per language or per directory, and is it worth stating so new files match?",
+      "draft_rule": "Name new source files in PascalCase, matching the existing tree.",
+      "confidence": "low",
+      "data": {}
+    },
+    {
+      "category": "git-workflow",
+      "title": "Reverts are frequent",
+      "evidence": [
+        "3/91 sampled commits are reverts"
+      ],
+      "question": "Does this point at a missing pre-merge verification step worth encoding as a rule (extra test gate, staged rollout)?",
+      "draft_rule": "Given the revert rate in this repository, verify <the specific gate that was missing> before merging.",
+      "confidence": "low",
+      "data": {}
+    }
+  ],
+  "hook_verification": {
+    "block-secrets": {
+      "fired": true,
+      "blocked": true,
+      "detail": "staged violation rejected",
+      "at": "2026-08-19T11:25:16+00:00",
+      "sha": "2aab792"
+    },
+    "block-absolute-paths": {
+      "fired": true,
+      "blocked": true,
+      "detail": "staged violation rejected",
+      "at": "2026-08-19T11:25:16+00:00",
+      "sha": "2aab792"
+    },
+    "pretool-guard": {
+      "fired": true,
+      "blocked": true,
+      "detail": "secret payload denied",
+      "at": "2026-08-19T11:25:16+00:00",
+      "sha": "2aab792"
+    },
+    "block-name-matched-kill": {
+      "fired": true,
+      "blocked": true,
+      "detail": "pkill denied",
+      "at": "2026-08-19T11:25:16+00:00",
+      "sha": "2aab792"
+    },
+    "check-rule-frontmatter": {
+      "fired": true,
+      "blocked": null,
+      "detail": "exit 0 (advisory; executed, not violated)",
+      "at": "2026-08-19T11:25:16+00:00",
+      "sha": "2aab792"
+    },
+    "audit-quad-agent-parity": {
+      "fired": true,
+      "blocked": null,
+      "detail": "exit 0 (advisory; executed, not violated)",
+      "at": "2026-08-19T11:25:16+00:00",
+      "sha": "2aab792"
+    },
+    "check-upstream-alignment": {
+      "fired": true,
+      "blocked": null,
+      "detail": "exit 0 (advisory; executed, not violated)",
+      "at": "2026-08-19T11:25:17+00:00",
+      "sha": "2aab792"
+    }
+  }
+}

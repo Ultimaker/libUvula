@@ -1,0 +1,1 @@
+../../.agents/rules/34-library-consumer-contract-rules.md

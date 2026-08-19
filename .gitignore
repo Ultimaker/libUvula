@@ -410,3 +410,7 @@ FodyWeavers.xsd
 # CMake local files
 CMakePresets.json
 CMakeUserPresets.json
+
+# Added by the agentic bootstrap: byproducts of the hooks it installs.
+*.py[cod]
+.agents/**/*.bootstrap-tmp
