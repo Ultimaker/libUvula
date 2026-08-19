@@ -1,4 +1,4 @@
-﻿// (c) 2025, UltiMaker -- see LICENCE for details
+// (c) 2025, UltiMaker -- see LICENCE for details
 
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
@@ -65,53 +65,64 @@ py::list pyProject(
     const uint32_t face_id)
 {
     pybind11::buffer_info stroke_polygon_buffer = stroke_polygon_array.request();
-    const std::span<Point2F> stroke_polygon = std::span(static_cast<Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.shape[0]);
-
     pybind11::buffer_info mesh_vertices_buffer = mesh_vertices_array.request();
-    const std::span<const Point3F> mesh_vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
-
     pybind11::buffer_info mesh_indices_buffer = mesh_indices_array.request();
-    const std::span<const Face> mesh_indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
-
     pybind11::buffer_info mesh_uv_buffer = mesh_uv_array.request();
-    const std::span<const Point2F> mesh_uv = std::span(static_cast<const Point2F*>(mesh_uv_buffer.ptr), mesh_uv_buffer.shape[0]);
-
     pybind11::buffer_info mesh_faces_connectivity_buffer = mesh_faces_connectivity_array.request();
+    const pybind11::buffer_info camera_projection_matrix_buf = camera_projection_matrix_array.request();
+    const pybind11::buffer_info camera_normal_buf = camera_normal_array.request();
+
+    if (stroke_polygon_buffer.ndim != 2 || mesh_vertices_buffer.ndim != 2 || mesh_indices_buffer.ndim != 2 || mesh_uv_buffer.ndim != 2 || mesh_faces_connectivity_buffer.ndim != 2)
+    {
+        throw std::runtime_error("Invalid array dimensions for projection inputs (expected 2D arrays).");
+    }
+
+    if (camera_projection_matrix_buf.size != 16 || camera_normal_buf.size != 3)
+    {
+        throw std::runtime_error("Invalid matrix or camera normal buffer size.");
+    }
+
+    const std::span<Point2F> stroke_polygon = std::span(static_cast<Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.shape[0]);
+    const std::span<const Point3F> mesh_vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
+    const std::span<const Face> mesh_indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
+    const std::span<const Point2F> mesh_uv = std::span(static_cast<const Point2F*>(mesh_uv_buffer.ptr), mesh_uv_buffer.shape[0]);
     const std::span<const FaceSigned> mesh_faces_connectivity = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
 
-    const pybind11::buffer_info camera_projection_matrix_buf = camera_projection_matrix_array.request();
-    const Matrix44F camera_projection_matrix(*static_cast<float (*)[4][4]>(camera_projection_matrix_buf.ptr));
+    const Matrix44F camera_projection_matrix(*static_cast<float(*)[4][4]>(camera_projection_matrix_buf.ptr));
 
-    const pybind11::buffer_info camera_normal_buf = camera_normal_array.request();
     const float* camera_normal_ptr = static_cast<float*>(camera_normal_buf.ptr);
     const Vector3F camera_normal(camera_normal_ptr[0], camera_normal_ptr[1], camera_normal_ptr[2]);
 
-    std::vector<Polygon> result = doProject(
-        stroke_polygon,
-        mesh_vertices,
-        mesh_indices,
-        mesh_uv,
-        mesh_faces_connectivity,
-        texture_width,
-        texture_height,
-        camera_projection_matrix,
-        is_camera_perspective,
-        viewport_width,
-        viewport_height,
-        camera_normal,
-        face_id);
+    std::vector<Polygon> result;
+    {
+        py::gil_scoped_release release;
+
+        result = doProject(
+            stroke_polygon,
+            mesh_vertices,
+            mesh_indices,
+            mesh_uv,
+            mesh_faces_connectivity,
+            texture_width,
+            texture_height,
+            camera_projection_matrix,
+            is_camera_perspective,
+            viewport_width,
+            viewport_height,
+            camera_normal,
+            face_id);
+    }
 
     py::list py_result;
     for (Polygon& polygon : result)
     {
-        py_result.append(
-            py::array_t<float>(py::buffer_info(
-                polygon.data(),
-                sizeof(float),
-                py::format_descriptor<float>::format(),
-                2,
-                { polygon.size(), static_cast<size_t>(2) },
-                { sizeof(float) * 2, sizeof(float) })));
+        py_result.append(py::array_t<float>(py::buffer_info(
+            polygon.data(),
+            sizeof(float),
+            py::format_descriptor<float>::format(),
+            2,
+            { polygon.size(), static_cast<size_t>(2) },
+            { sizeof(float) * 2, sizeof(float) })));
     }
 
     return py_result;
