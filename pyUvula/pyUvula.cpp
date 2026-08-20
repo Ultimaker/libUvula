@@ -82,6 +82,7 @@ py::list pyProject(
         throw std::runtime_error("Invalid matrix or camera normal buffer size.");
     }
 
+    // size/stride gives the correct struct count for both flat 1D and shaped 2D arrays; shape[0] only works for 2D.
     const std::span<Point2F> stroke_polygon = std::span(static_cast<Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.size / 2);
     const std::span<const Point3F> mesh_vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.size / 3);
     const std::span<const Face> mesh_indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.size / 3);
