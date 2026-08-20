@@ -72,9 +72,9 @@ py::list pyProject(
     const pybind11::buffer_info camera_projection_matrix_buf = camera_projection_matrix_array.request();
     const pybind11::buffer_info camera_normal_buf = camera_normal_array.request();
 
-    if (stroke_polygon_buffer.ndim != 2 || mesh_vertices_buffer.ndim != 2 || mesh_indices_buffer.ndim != 2 || mesh_uv_buffer.ndim != 2 || mesh_faces_connectivity_buffer.ndim != 2)
+    if (stroke_polygon_buffer.size % 2 != 0 || mesh_vertices_buffer.size % 3 != 0 || mesh_indices_buffer.size % 3 != 0 || mesh_uv_buffer.size % 2 != 0 || mesh_faces_connectivity_buffer.size % 3 != 0)
     {
-        throw std::runtime_error("Invalid array dimensions for projection inputs (expected 2D arrays).");
+        throw std::runtime_error("Invalid buffer sizes for projection inputs (element counts must be divisible by struct stride).");
     }
 
     if (camera_projection_matrix_buf.size != 16 || camera_normal_buf.size != 3)
@@ -82,11 +82,11 @@ py::list pyProject(
         throw std::runtime_error("Invalid matrix or camera normal buffer size.");
     }
 
-    const std::span<Point2F> stroke_polygon = std::span(static_cast<Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.shape[0]);
-    const std::span<const Point3F> mesh_vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
-    const std::span<const Face> mesh_indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
-    const std::span<const Point2F> mesh_uv = std::span(static_cast<const Point2F*>(mesh_uv_buffer.ptr), mesh_uv_buffer.shape[0]);
-    const std::span<const FaceSigned> mesh_faces_connectivity = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
+    const std::span<Point2F> stroke_polygon = std::span(static_cast<Point2F*>(stroke_polygon_buffer.ptr), stroke_polygon_buffer.size / 2);
+    const std::span<const Point3F> mesh_vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.size / 3);
+    const std::span<const Face> mesh_indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.size / 3);
+    const std::span<const Point2F> mesh_uv = std::span(static_cast<const Point2F*>(mesh_uv_buffer.ptr), mesh_uv_buffer.size / 2);
+    const std::span<const FaceSigned> mesh_faces_connectivity = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.size / 3);
 
     const Matrix44F camera_projection_matrix(*static_cast<float(*)[4][4]>(camera_projection_matrix_buf.ptr));
 
