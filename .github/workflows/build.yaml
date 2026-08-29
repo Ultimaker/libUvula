@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+  pull-requests: read  # for check-pr-labels
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - frontend
+          - backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.NPM_GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.INFRA_WI_PROVIDER }}
+      - name: Use gcloud auth for Docker
+        run: gcloud auth configure-docker europe-west4-docker.pkg.dev
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: europe-west4-docker.pkg.dev/um-cloud-infra/stardust/account-${{ matrix.service }}
+          tags: |
+            type=sha
+            type=raw,value=latest,enable=${{github.ref == 'refs/heads/main' }}
+            type=raw,value=staging,enable=${{github.ref == 'refs/heads/staging' }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          platforms: linux/amd64
+          context: ./${{ matrix.service }}
+          target: release
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          secrets: |
+            "github_token=${{ secrets.GITHUB_TOKEN }}"

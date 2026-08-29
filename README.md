@@ -36,7 +36,7 @@ The returned width and height are the recommended values for the texture. It is 
 A command-line tool is provided for the convenience of testing, and can be built by adding `-o with_cli=True` when doing the setup with `conan`. Then the use is pretty simple:
 
 ```bash
-./build/Release/cli/uvula /home/myself/dinosaur.stl -o /home/myself/dinosaur_unwrapped.obj
+./build/Release/cli/uvula ./dinosaur.stl -o ./dinosaur_unwrapped.obj
 ```
 
 Then you can display the resulting OBJ file with e.g. Blender.

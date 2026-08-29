@@ -1,0 +1,69 @@
+name: Test
+
+on:
+  push:
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+  pull-requests: read # for check-pr-labels
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: frontend
+            command: lint
+          - service: frontend
+            command: test
+          - service: backend
+            command: coverage
+          - service: backend
+            command: styling
+          - service: backend
+            command: lint
+    name: Test ${{ matrix.service }} (${{ matrix.command }})
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.NPM_GITHUB_TOKEN }} # This needs a better solution
+          fetch-depth: 0
+      - name: Build tests
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ matrix.service }}
+          target: tests
+          push: false
+          tags: account-${{ matrix.service }}-tests
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
+          secrets: |
+            "github_token=${{ secrets.GITHUB_TOKEN }}"
+      - name: Test ${{ matrix.service }}
+        run: docker compose -f docker-compose-test.yaml run -e FORCE_COLOR=1 ${{ matrix.service }}-${{ matrix.command }}
+  cypress:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          cache: 'npm'
+          node-version-file: 'frontend/.nvmrc'
+          cache-dependency-path: 'frontend/package-lock.json'
+      - name: Cypress run
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: frontend
+          start: npm start
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

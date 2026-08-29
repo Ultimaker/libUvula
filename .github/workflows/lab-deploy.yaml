@@ -1,0 +1,40 @@
+---
+name: Lab Deployment
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  deploy-lab:
+    name: Deploy ${{ matrix.service }}
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - account-api
+          - account-worker
+          - account-frontend
+        include:
+          - service: account-api
+            image-name: account-backend
+            share-url: true
+          - service: account-worker
+            image-name: account-backend
+            share-url: false
+          - service: account-frontend
+            image-name: account-frontend
+            share-url: false
+    uses: Ultimaker/stardust-workflows/.github/workflows/lab-deploy.yaml@master
+    with:
+      image-name: ${{ matrix.image-name }}
+      service: ${{ matrix.service }}
+      share-url: ${{ matrix.share-url }}
+      app-name: account
+      app-url: https://account-api-${{ github.event.pull_request.number }}-ec3feeu5ma-ew.a.run.app
+      front-end-proxy-host: https://account-frontend-${{ github.event.pull_request.number }}-ec3feeu5ma-ew.a.run.app
+    secrets: inherit

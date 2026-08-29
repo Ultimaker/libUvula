@@ -1,0 +1,15 @@
+---
+name: Dependabot
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches-ignore:
+    - main
+
+permissions:
+  # Needed for Workload Identity
+  id-token: write
+
+jobs:
+  dependabot_auto_merge:
+    uses: Ultimaker/stardust-workflows/.github/workflows/dependabot.yaml@master

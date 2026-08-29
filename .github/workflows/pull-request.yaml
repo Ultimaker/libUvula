@@ -1,0 +1,80 @@
+---
+name: Pull Request
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened, labeled, unlabeled, closed ]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  pull-requests: read  # for check-pr-labels
+
+jobs:
+  ref-check:
+    name: Submodule ref check
+    uses: Ultimaker/stardust-workflows/.github/workflows/submodule-ref-check.yaml@master
+    secrets: inherit
+
+  # run deployment when labeled or when PR with label is changed
+  deploy-lab:
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'LAB_ENV') ||
+      (contains('opened synchronize reopened', github.event.action) && contains(github.event.pull_request.labels.*.name, 'LAB_ENV'))
+    name: Deploy lab
+    uses: ./.github/workflows/lab-deploy.yaml
+    secrets: inherit
+
+  # remove deployment when label is removed or PR is closed
+  delete-lab:
+    name: Delete lab
+    if: (github.event.action == 'unlabeled' && github.event.label.name == 'LAB_ENV') || github.event.action == 'closed'
+    uses: ./.github/workflows/lab-delete.yaml
+    secrets: inherit
+
+  # Add list of PRs included to the production PR
+  comment-main-pr:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.base.ref == 'main' && github.event.action == 'opened'
+    name: Comment on main PR
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+          token: ${{ secrets.NPM_GITHUB_TOKEN }}
+          fetch-depth: 0
+      - name: Compose message
+        id: compose-message
+        run: |
+          # Write a list of PRs
+          echo "This PR includes the following PRs:" | tee message.txt
+          git log origin/${{github.event.pull_request.base.ref}}.. | grep -e '#[0-9]\+' -o | sed 's/^/- /' | tee --append message.txt
+
+          # Retrieve the JSON specs
+          curl https://account.ultimaker.com/spec --output production-spec.json --no-progress-meter
+          curl https://account-staging.ultimaker.com/spec --output staging-spec.json --no-progress-meter
+
+          # Compare the specs and write them in a code block (```diff ... ```)
+          echo -e "\nThe following changes were made to the API in staging:\n\`\`\`diff" | tee --append message.txt
+          diff <(jq --sort-keys . production-spec.json) <(jq --sort-keys . staging-spec.json) | tee --append message.txt
+          echo -e "\`\`\`\n" | tee --append message.txt
+
+          # Multiline string in GitHub output is just ugly!
+          DELIMITER=$(openssl rand -hex 12)
+          echo "message<<$DELIMITER" >> $GITHUB_OUTPUT
+          cat message.txt | head -c 2500 >> $GITHUB_OUTPUT  # slack messages are max 3k characters
+          echo "$DELIMITER" >> $GITHUB_OUTPUT
+      - name: Comment on main PR
+        uses: actions/github-script@v6
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.NPM_GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: ${{ toJSON(steps.compose-message.outputs.message) }}
+            })

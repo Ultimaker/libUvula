@@ -1,0 +1,17 @@
+# Generally we can assume these file extensions belongs to a group of developers
+*.scss              @Stardust_frontend
+*.tsx               @Stardust_frontend
+*.js                @Stardust_frontend
+*.html              @Stardust_frontend
+*.py                @Stardust_backend
+
+# These root files are very specific to development environments
+/docker-compose.yml @Stardust_devops
+Dockerfile          @Stardust_devops
+/*.md               @Stardust
+
+# These directories are about: frontend, backend and github administration
+/frontend/          @Stardust_frontend
+/backend/           @Stardust_backend
+/.github/           @Stardust_devops
+/secrets/           @Stardust_devops
