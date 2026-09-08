@@ -2,7 +2,8 @@
 
 #pragma once
 
-class Matrix44F;
+#include <bit>
+#include <memory>
 
 class Point3F
 {
@@ -41,8 +42,28 @@ public:
         return lhs.z_ < rhs.z_;
     }
 
+    inline bool operator==(const Point3F& other) const = default;
+
+    // NOTE: _Exact_ hash, don't use when comparison requires near-equal.
+    inline size_t hash_() const noexcept
+    {
+        return std::hash<float>{}(x_) ^ (std::hash<float>{}(y_) << 1) ^ (std::hash<float>{}(z_) << 2);
+    }
+
 private:
     float x_{ 0.0 };
     float y_{ 0.0 };
     float z_{ 0.0 };
 };
+
+namespace std
+{
+template<>
+struct hash<Point3F>
+{
+    inline size_t operator()(const Point3F& pt) const noexcept
+    {
+        return pt.hash_();
+    }
+};
+} // namespace std

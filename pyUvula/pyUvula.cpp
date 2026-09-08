@@ -5,6 +5,7 @@
 
 #include "Face.h"
 #include "Matrix44F.h"
+#include "needs_supports.h"
 #include "Point2F.h"
 #include "Point3F.h"
 #include "Vector3F.h"
@@ -117,6 +118,28 @@ py::list pyProject(
     return py_result;
 }
 
+py::bool_ pyCheckDownwardsFeatures(
+    float support_angle,
+    float close_to_buildplate_dist,
+    float min_support_area,
+    const py::array_t<float>& vertices_array,
+    const py::array_t<int32_t>& indices_array,
+    const py::array_t<int32_t>& mesh_faces_connectivity_array)
+{
+    pybind11::buffer_info mesh_vertices_buffer = vertices_array.request();
+    const std::span<const Point3F> vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
+
+    pybind11::buffer_info mesh_indices_buffer = indices_array.request();
+    const std::span<const Face> indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
+
+    pybind11::buffer_info mesh_faces_connectivity_buffer = mesh_faces_connectivity_array.request();
+    const std::span<const FaceSigned> face_connects = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
+
+
+    return checkForDownVertices(close_to_buildplate_dist, vertices, indices)
+        || checkForDownFaces(support_angle, close_to_buildplate_dist, min_support_area, vertices, indices, face_connects);
+}
+
 PYBIND11_MODULE(pyUvula, module)
 {
     module.doc() = "UV-unwrapping library (or bindings to library), segmentation uses a classic normal-based grouping and charts packing uses xatlas";
@@ -124,4 +147,5 @@ PYBIND11_MODULE(pyUvula, module)
 
     module.def("unwrap", &pyUnwrap, "Given the vertices, indices of a mesh, unwrap UV for texture-coordinates.");
     module.def("project", &pyProject, "Projects a stroke polygon into an object texture.");
+    module.def("checkDownwardsFeatures", &pyCheckDownwardsFeatures, "Checks for parts of a mesh that would be unsupported, given no supports.");
 }
