@@ -47,6 +47,18 @@ std::vector<Polygon> doProject(
     const Vector3F& camera_normal,
     const uint32_t face_id);
 
+/**
+ * @brief Gets the faces that are connected to the original pointed face, given an angle threshold
+ * @param mesh_vertices           The coordinates of the 3D vertices of the mesh.
+ * @param mesh_indices            The mesh faces as indices into the vertex array, which may be empty of the mesh doesn't have indices.
+ * @param mesh_uv                 The UV coordinates for each mesh vertex.
+ * @param mesh_faces_connectivity For each face of the mesh, contains the 3 indices of the adjacent faces, or -1 is edge is not connected.
+ * @param texture_width           The width of the texture in pixels.
+ * @param texture_height          The height of the texture in pixels.
+ * @param face_id                 The ID of the initially pointed face
+ * @param threshold_angle         The threshold to select adjacent faces by absolute angle difference
+ * @return
+ */
 std::vector<Polygon> doGetConnectedFaces(
     const std::span<const Point3F>& mesh_vertices,
     const std::span<const Face>& mesh_indices,
