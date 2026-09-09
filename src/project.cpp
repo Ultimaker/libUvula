@@ -304,7 +304,7 @@ std::vector<Polygon> doGetConnectedFaces(
             Polygon current_polygon;
             for (const Point2F& point_uv : { current_uv.p1, current_uv.p2, current_uv.p3 })
             {
-                current_polygon.push_back(Point2F(point_uv.x * texture_width, point_uv.y * texture_height));
+                current_polygon.emplace_back(point_uv.x * texture_width, point_uv.y * texture_height);
             }
             result.push_back(std::move(current_polygon));
 
