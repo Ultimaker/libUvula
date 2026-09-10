@@ -5,5 +5,5 @@
 
 std::optional<Vector3F> Triangle3F::normal() const
 {
-    return geometry_utils::triangleNormal((*this)[0], (*this)[1], (*this)[2]);
+    return geometry_utils::triangleNormal(std::get<0>(*this), std::get<1>(*this), std::get<2>(*this));
 }
