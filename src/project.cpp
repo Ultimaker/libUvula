@@ -25,7 +25,7 @@ Face getFace(const std::span<const Face>& mesh_indices, const uint32_t face_inde
 
 Triangle3F getFaceTriangle(const std::span<const Point3F>& mesh_vertices, const Face& face)
 {
-    return Triangle3F(mesh_vertices[face[0]], mesh_vertices[face[1]], mesh_vertices[face[2]]);
+    return Triangle3F({mesh_vertices[face[0]], mesh_vertices[face[1]], mesh_vertices[face[2]]});
 }
 
 Triangle2F getFaceUv(const std::span<const Point2F>& mesh_uv, const Face& face)
@@ -47,16 +47,16 @@ Point2F projectToViewport(const Point3F& point, const Matrix44F& matrix, const b
 
 Triangle2F projectToViewport(const Triangle3F& triangle, const Matrix44F& matrix, const bool is_camera_perspective, const int viewport_width, const int viewport_height)
 {
-    return Triangle2F{ projectToViewport(triangle.p1(), matrix, is_camera_perspective, viewport_width, viewport_height),
-                       projectToViewport(triangle.p2(), matrix, is_camera_perspective, viewport_width, viewport_height),
-                       projectToViewport(triangle.p3(), matrix, is_camera_perspective, viewport_width, viewport_height) };
+    return Triangle2F{ projectToViewport(triangle[0], matrix, is_camera_perspective, viewport_width, viewport_height),
+                       projectToViewport(triangle[1], matrix, is_camera_perspective, viewport_width, viewport_height),
+                       projectToViewport(triangle[2], matrix, is_camera_perspective, viewport_width, viewport_height) };
 }
 
 std::vector<Point3F> getBarycentricCoordinates(const Polygon& polygon, const Triangle2F& triangle)
 {
     // Calculate base vectors
-    const Vector2F v0(triangle.p1, triangle.p2);
-    const Vector2F v1(triangle.p1, triangle.p3);
+    const Vector2F v0(triangle[0], triangle[1]);
+    const Vector2F v1(triangle[0], triangle[2]);
 
     // Compute dot products
     const double d00 = v0.dot(v0);
@@ -78,7 +78,7 @@ std::vector<Point3F> getBarycentricCoordinates(const Polygon& polygon, const Tri
 
     for (const Point2F& point : polygon)
     {
-        const Vector2F v2(triangle.p1, point);
+        const Vector2F v2(triangle[0], point);
         const double d20 = v2.dot(v0);
         const double d21 = v2.dot(v1);
 
@@ -96,8 +96,8 @@ std::vector<Point3F> getBarycentricCoordinates(const Polygon& polygon, const Tri
 
 Point2F getTextureCoordinates(const Point3F& barycentric_coordinates, const Triangle2F& uv_coordinates, const uint32_t texture_width, const uint32_t texture_height)
 {
-    const float u = (uv_coordinates.p1.x * barycentric_coordinates.x()) + (uv_coordinates.p2.x * barycentric_coordinates.y()) + (uv_coordinates.p3.x * barycentric_coordinates.z());
-    const float v = (uv_coordinates.p1.y * barycentric_coordinates.x()) + (uv_coordinates.p2.y * barycentric_coordinates.y()) + (uv_coordinates.p3.y * barycentric_coordinates.z());
+    const float u = (uv_coordinates[0].x * barycentric_coordinates.x()) + (uv_coordinates[1].x * barycentric_coordinates.y()) + (uv_coordinates[2].x * barycentric_coordinates.z());
+    const float v = (uv_coordinates[0].y * barycentric_coordinates.x()) + (uv_coordinates[1].y * barycentric_coordinates.y()) + (uv_coordinates[2].y * barycentric_coordinates.z());
     return Point2F{ u * texture_width, v * texture_height };
 }
 
@@ -209,7 +209,7 @@ std::vector<Polygon> doProject(
 
         const Triangle2F projected_face_triangle = projectToViewport(face_triangle, camera_projection_matrix, is_camera_perspective, viewport_width, viewport_height);
         const ClipperLib::Path projected_face_triangle_path
-            = toPath(std::initializer_list<Point2F>{ projected_face_triangle.p1, projected_face_triangle.p2, projected_face_triangle.p3 });
+            = toPath(std::initializer_list<Point2F>{ projected_face_triangle[0], projected_face_triangle[1], projected_face_triangle[2] });
         const std::vector<Polygon> uv_areas = toPolygons(intersect(stroke_polygon_path, projected_face_triangle_path));
 
         if (uv_areas.empty())
@@ -302,7 +302,7 @@ std::vector<Polygon> doGetConnectedFaces(
             // Add the polygon to the result
             const Triangle2F current_uv = getFaceUv(mesh_uv, current_face);
             Polygon current_polygon;
-            for (const Point2F& point_uv : { current_uv.p1, current_uv.p2, current_uv.p3 })
+            for (const Point2F& point_uv : current_uv)
             {
                 current_polygon.emplace_back(point_uv.x * texture_width, point_uv.y * texture_height);
             }
@@ -311,7 +311,7 @@ std::vector<Polygon> doGetConnectedFaces(
             // Visit the connected faces
             const FaceSigned& connected_faces = mesh_faces_connectivity[current_face_id];
 
-            for (int32_t connected_face_id : { connected_faces.i1, connected_faces.i2, connected_faces.i3 })
+            for (int32_t connected_face_id : connected_faces)
             {
                 if (connected_face_id >= 0 && ! visited_faces.contains(connected_face_id))
                 {
