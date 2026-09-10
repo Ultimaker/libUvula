@@ -2,11 +2,12 @@
 
 #pragma once
 
+#include "Face.h"
+
 #include <span>
 #include <vector>
 
-#include "Face.h"
-#include "Point3F.h"
+class Point3F;
 
 /**
  * \brief Creates a face-connectivity data-structure.

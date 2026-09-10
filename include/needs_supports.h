@@ -3,9 +3,10 @@
 #pragma once
 
 #include "Face.h"
-#include "Point3F.h"
 
 #include <span>
+
+class Point3F;
 
 /**
  * \brief Checks for downwards pointing (so, smaller in y-axis) vertices (unless 'close enough' to y=0) given a mesh.
@@ -27,7 +28,7 @@ bool checkForDownVertices(
  * \param min_support_area How large any grouped area of faces should be (measured by area) for it to be counted.
  * \param vertices The vertices of the mesh.
  * \param indices The indices of the faces of the mesh, grouped by face.
- * \param mes_connects The mesh-connectivity; per face, contains the indices of the neighbour-faces (-1 for none).
+ * \param mesh_connects The mesh-connectivity; per face, contains the indices of the neighbour-faces (-1 for none).
  * \return True if there are any such vertices, false otherwise.
  */
 bool checkForDownFaces(

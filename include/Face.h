@@ -13,7 +13,7 @@ struct FaceIndex
     IndexType i2{ 0 };
     IndexType i3{ 0 };
 
-    IndexType& i(const int index)
+    IndexType& at(const int index)
     {
         assert(index >= 0 && index < 3);
         switch (index)

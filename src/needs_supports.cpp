@@ -3,6 +3,7 @@
 #include "needs_supports.h"
 
 #include "geometry_utils.h"
+#include "Point3F.h"
 #include "Vector3F.h"
 
 #include <algorithm>
@@ -35,6 +36,7 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
         {
             verts_with_lower[a] = false;
             verts_with_lower[b] = false;
+            return;
         }
         verts_with_lower[a.y() > b.y() ? a : b] = false;
     };
@@ -42,7 +44,7 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
     // Create a vertex adjacency graph -- but only append vertices that are _lower_ (except too close or below the BP).
     const auto& get_vertices_func = indices.empty() ? getVerticesEmpty : getVerticesFull;
     const auto face_count = indices.empty() ? vertices.size() / 3 : indices.size();
-    for (const auto& face_idx : ranges::views::iota(0UL, face_count - 1))
+    for (const auto& face_idx : ranges::views::iota(0UL, face_count))
     {
         const auto [a, b, c] = get_vertices_func(vertices, indices, face_idx);
 
@@ -93,7 +95,7 @@ bool checkForDownFaces(
     std::unordered_map<ptrdiff_t, float> candidate_overhangs;
     const auto& get_vertices_func = indices.empty() ? getVerticesEmpty : getVerticesFull;
     const auto face_count = indices.empty() ? vertices.size() / 3 : indices.size();
-    for (const auto& face_idx : ranges::views::iota(0UL, face_count - 1))
+    for (const auto& face_idx : ranges::views::iota(0UL, face_count))
     {
         const auto [a, b, c] = get_vertices_func(vertices, indices, face_idx);
 
@@ -119,7 +121,7 @@ bool checkForDownFaces(
         }
 
         // Collect the area for further analysis.
-        const float area = 0.5f * Vector3F(b, a).cross(Vector3F(c, a)).abs_().length();
+        const float area = 0.5f * Vector3F(b, a).cross(Vector3F(c, a)).abs().length();
         candidate_overhangs[face_idx] = area;
     }
 

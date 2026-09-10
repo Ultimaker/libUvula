@@ -2,22 +2,24 @@
 
 #include "connect_faces.h"
 
+#include "Point3F.h"
+
 #include <range/v3/view/enumerate.hpp>
 #include <range/v3/view/iota.hpp>
 #include <range/v3/numeric/iota.hpp>
 #include <map>
 #include <unordered_map>
 
-std::tuple<int32_t, int32_t, int32_t> getIndexEquivFull(const std::vector<int32_t>& index_equivalaneces, const std::span<const Face>& indices, const int32_t face_idx)
+std::tuple<int32_t, int32_t, int32_t> getIndexEquivFull(const std::vector<int32_t>& index_equivalances, const std::span<const Face>& indices, const int32_t face_idx)
 {
     const Face& face = indices[face_idx];
-    return { index_equivalaneces[face.i1], index_equivalaneces[face.i2], index_equivalaneces[face.i3] };
+    return { index_equivalances[face.i1], index_equivalances[face.i2], index_equivalances[face.i3] };
 }
 
-std::tuple<int32_t, int32_t, int32_t> getIndexEquivEmpty(const std::vector<int32_t>& index_equivalaneces, const std::span<const Face>& _, const int32_t face_idx)
+std::tuple<int32_t, int32_t, int32_t> getIndexEquivEmpty(const std::vector<int32_t>& index_equivalances, const std::span<const Face>& _, const int32_t face_idx)
 {
     const auto base_idx = face_idx * 3;
-    return { index_equivalaneces[base_idx], index_equivalaneces[base_idx + 1], index_equivalaneces[base_idx + 2] };
+    return { index_equivalances[base_idx], index_equivalances[base_idx + 1], index_equivalances[base_idx + 2] };
 }
 
 void connectFaces(const std::span<const Point3F>& vertices, const std::span<const Face>& indices, std::vector<FaceSigned>& out_face_connects)
@@ -59,7 +61,7 @@ void connectFaces(const std::span<const Point3F>& vertices, const std::span<cons
     std::map<std::pair<int32_t, int32_t>, int32_t> edge_to_face;
     // ^^^ Would need to make hash for pair to make unordered_map work.
     const auto face_count = indices.empty() ? vertices.size() / 3 : indices.size();
-    for (const int32_t face_idx : ranges::views::iota(0UL, face_count - 1UL))
+    for (const int32_t face_idx : ranges::views::iota(0UL, face_count))
     {
         const auto edges = get_edge_list_func(face_idx);
         for (const auto [edge_idx, edge] : edges | ranges::views::enumerate)
@@ -67,14 +69,14 @@ void connectFaces(const std::span<const Point3F>& vertices, const std::span<cons
             if (edge_to_face.contains(edge))
             {
                 const int32_t other_face = edge_to_face[edge];
-                out_face_connects.at(face_idx).i(edge_idx) = other_face;
+                out_face_connects.at(face_idx).at(edge_idx) = other_face;
 
                 const auto other_edges = get_edge_list_func(other_face);
                 for (const auto [i_edge, e] : other_edges | ranges::views::enumerate)
                 {
                     if (e == edge)
                     {
-                        out_face_connects[other_face].i(i_edge) = face_idx;
+                        out_face_connects[other_face].at(i_edge) = face_idx;
                         break;
                     }
                 }

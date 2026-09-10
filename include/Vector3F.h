@@ -34,7 +34,7 @@ public:
 
     [[nodiscard]] Vector3F cross(const Vector3F& other) const;
 
-    [[nodiscard]] Vector3F abs_() const;
+    [[nodiscard]] Vector3F abs() const;
 
     Vector3F operator+(const Vector3F& other) const;
 
