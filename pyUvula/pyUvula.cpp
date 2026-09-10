@@ -51,6 +51,24 @@ py::tuple pyUnwrap(const py::array_t<float>& vertices_array, const py::array_t<i
     return py::make_tuple(py::array(py::buffer_info(res.data(), strides[1], py::format_descriptor<float>::format(), shape.size(), shape, strides)), texture_width, texture_height);
 }
 
+py::list makePyPolygonsList(const std::vector<Polygon>& polygons)
+{
+    py::list py_result;
+    for (const Polygon& polygon : polygons)
+    {
+        py_result.append(
+            py::array_t<float>(py::buffer_info(
+                const_cast<Point2F*>(polygon.data()),
+                sizeof(float),
+                py::format_descriptor<float>::format(),
+                2,
+                { polygon.size(), static_cast<size_t>(2) },
+                { sizeof(float) * 2, sizeof(float) })));
+    }
+
+    return py_result;
+}
+
 py::list pyProject(
     const py::array_t<float>& stroke_polygon_array,
     const py::array_t<float>& mesh_vertices_array,
@@ -88,7 +106,7 @@ py::list pyProject(
     const float* camera_normal_ptr = static_cast<float*>(camera_normal_buf.ptr);
     const Vector3F camera_normal(camera_normal_ptr[0], camera_normal_ptr[1], camera_normal_ptr[2]);
 
-    std::vector<Polygon> result = doProject(
+    const std::vector<Polygon> result = doProject(
         stroke_polygon,
         mesh_vertices,
         mesh_indices,
@@ -103,20 +121,34 @@ py::list pyProject(
         camera_normal,
         face_id);
 
-    py::list py_result;
-    for (Polygon& polygon : result)
-    {
-        py_result.append(
-            py::array_t<float>(py::buffer_info(
-                polygon.data(),
-                sizeof(float),
-                py::format_descriptor<float>::format(),
-                2,
-                { polygon.size(), static_cast<size_t>(2) },
-                { sizeof(float) * 2, sizeof(float) })));
-    }
+    return makePyPolygonsList(result);
+}
 
-    return py_result;
+py::list pyGetConnectedFaces(
+    const py::array_t<float>& mesh_vertices_array,
+    const py::array_t<uint32_t>& mesh_indices_array,
+    const py::array_t<float>& mesh_uv_array,
+    const py::array_t<int32_t>& mesh_faces_connectivity_array,
+    const uint32_t texture_width,
+    const uint32_t texture_height,
+    const uint32_t face_id,
+    const double threshold_angle)
+{
+    pybind11::buffer_info mesh_vertices_buffer = mesh_vertices_array.request();
+    const std::span<const Point3F> mesh_vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
+
+    pybind11::buffer_info mesh_indices_buffer = mesh_indices_array.request();
+    const std::span<const Face> mesh_indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
+
+    pybind11::buffer_info mesh_uv_buffer = mesh_uv_array.request();
+    const std::span<const Point2F> mesh_uv = std::span(static_cast<const Point2F*>(mesh_uv_buffer.ptr), mesh_uv_buffer.shape[0]);
+
+    pybind11::buffer_info mesh_faces_connectivity_buffer = mesh_faces_connectivity_array.request();
+    const std::span<const FaceSigned> mesh_faces_connectivity = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
+
+    const std::vector<Polygon> result = doGetConnectedFaces(mesh_vertices, mesh_indices, mesh_uv, mesh_faces_connectivity, texture_width, texture_height, face_id, threshold_angle);
+
+    return makePyPolygonsList(result);
 }
 
 py::array pyConnectFaces(const py::array_t<float>& vertices_array, const py::array_t<uint32_t>& indices_array)
@@ -173,4 +205,5 @@ PYBIND11_MODULE(pyUvula, module)
     module.def("project", &pyProject, "Projects a stroke polygon into an object texture.");
     module.def("connectFaces", &pyConnectFaces, "Make a face-connectivity data-structure from raw vertices + indices input.");
     module.def("checkDownwardsFeatures", &pyCheckDownwardsFeatures, "Checks for parts of a mesh that would be unsupported, given no supports.");
+    module.def("getConnectedFaces", &pyGetConnectedFaces, "Gets the polygons of the faces connected to the given initial face.");
 }

@@ -25,7 +25,8 @@ public:
         return p3_;
     }
 
-    [[nodiscard]] Vector3F normal() const;
+    /*! @return The unitary normal of this triangle, or nullopt if it is degenerate */
+    [[nodiscard]] std::optional<Vector3F> normal() const;
 
 private:
     Point3F p1_;
