@@ -249,12 +249,12 @@ EMSCRIPTEN_BINDINGS(uvula)
         .function("z", &Vector3F::z);
 
     value_array<Face>("Face")
-        .element(index<0>())
-        .element(index<1>())
-        .element(index<2>());
+        .element(emscripten::index<0>())
+        .element(emscripten::index<1>())
+        .element(emscripten::index<2>());
 
     value_array<FaceSigned>("FaceSigned")
-        .element(index<0>())
-        .element(index<1>())
-        .element(index<2>());
+        .element(emscripten::index<0>())
+        .element(emscripten::index<1>())
+        .element(emscripten::index<2>());
 }
