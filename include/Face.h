@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstdint>
 #include <utility>
 
@@ -11,6 +12,17 @@ struct FaceIndex
     IndexType i1{ 0 };
     IndexType i2{ 0 };
     IndexType i3{ 0 };
+
+    IndexType& i(const int index)
+    {
+        assert(index >= 0 && index < 3);
+        switch (index)
+        {
+            case 0: return i1;
+            case 1: return i2;
+            default: return i3;
+        }
+    }
 
     inline bool operator==(const FaceIndex<IndexType>& other) const = default;
 };

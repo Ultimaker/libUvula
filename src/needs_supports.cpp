@@ -9,13 +9,26 @@
 #include <array>
 #include <numeric>
 #include <range/v3/view/enumerate.hpp>
+#include <range/v3/view/iota.hpp>
 #include <unordered_map>
 #include <set>
 
+std::tuple<const Point3F&, const Point3F&, const Point3F&> getVerticesFull(const std::span<const Point3F>& vertices, const std::span<const Face>& indices, const int32_t face_idx)
+{
+    const Face& face = indices[face_idx];
+    return { vertices[face.i1], vertices[face.i2], vertices[face.i3] };
+}
+
+std::tuple<const Point3F&, const Point3F&, const Point3F&> getVerticesEmpty(const std::span<const Point3F>& vertices, const std::span<const Face>& _, const int32_t face_idx)
+{
+    const auto base_idx = face_idx * 3;
+    return { vertices[base_idx], vertices[base_idx + 1], vertices[base_idx + 2] };
+}
 
 bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<const Point3F>& vertices, const std::span<const Face>& indices)
 {
     std::unordered_map<Point3F, bool> verts_with_lower;
+    // ^^^ Note that yes, this needs to be a Point3F, not a pointer to a Point3F, since we need to  be prepared for equivalent points.
     const auto handle_edge_func = [close_to_buildplate_dist, &verts_with_lower](const Point3F& a, const Point3F& b)
     {
         if (std::min(a.y(), b.y()) < close_to_buildplate_dist || a.y() == b.y())
@@ -27,11 +40,11 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
     };
 
     // Create a vertex adjacency graph -- but only append vertices that are _lower_ (except too close or below the BP).
-    for (const auto& face : indices)
+    const auto& get_vertices_func = indices.empty() ? getVerticesEmpty : getVerticesFull;
+    const auto face_count = indices.empty() ? vertices.size() / 3 : indices.size();
+    for (const auto& face_idx : ranges::views::iota(0UL, face_count - 1))
     {
-        const auto& a = vertices[face.i1];
-        const auto& b = vertices[face.i2];
-        const auto& c = vertices[face.i3];
+        const auto [a, b, c] = get_vertices_func(vertices, indices, face_idx);
 
         // Check the angle; NOTE: Not against the support angle this time, but whether this tri is facing up or down.
         const auto maybe_face_norm = geometry_utils::triangleNormal(a, b, c);
@@ -44,7 +57,7 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
         const bool norm_down = ((-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? asinf(face_norm.y()) : 0.0f) < 0.0f;
 
         // Mark each vertex as handled if the norm when that's up, otherwise check each edge.
-        for (const auto& v : std::array{ a, b, c })
+        for (const auto& v : { a, b, c })
         {
             if (! verts_with_lower.contains(v))
             {
@@ -78,11 +91,11 @@ bool checkForDownFaces(
     const std::span<const FaceSigned>& mesh_connects)
 {
     std::unordered_map<ptrdiff_t, float> candidate_overhangs;
-    for (const auto [face_idx, face] : ranges::views::enumerate(indices))
+    const auto& get_vertices_func = indices.empty() ? getVerticesEmpty : getVerticesFull;
+    const auto face_count = indices.empty() ? vertices.size() / 3 : indices.size();
+    for (const auto& face_idx : ranges::views::iota(0UL, face_count - 1))
     {
-        const auto& a = vertices[face.i1];
-        const auto& b = vertices[face.i2];
-        const auto& c = vertices[face.i3];
+        const auto [a, b, c] = get_vertices_func(vertices, indices, face_idx);
 
         const auto maybe_face_norm = geometry_utils::triangleNormal(a, b, c);
         if (! maybe_face_norm.has_value())
@@ -121,7 +134,7 @@ bool checkForDownFaces(
         std::set<ptrdiff_t> res{face_idx};
         visited.insert(face_idx);
         const auto& nb_face_ids = mesh_connects[face_idx];
-        for (const auto& nb_face_idx : std::array{ nb_face_ids.i1, nb_face_ids.i2, nb_face_ids.i3 })
+        for (const auto& nb_face_idx : { nb_face_ids.i1, nb_face_ids.i2, nb_face_ids.i3 })
         {
             if (nb_face_idx >= 0 && ! visited.contains(nb_face_idx) && candidate_overhangs.contains(nb_face_idx))
             {
