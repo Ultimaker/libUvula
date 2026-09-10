@@ -248,13 +248,13 @@ EMSCRIPTEN_BINDINGS(uvula)
         .function("y", &Vector3F::y)
         .function("z", &Vector3F::z);
 
-    value_object<Face>("Face")
-        .field("i1", &Face::i1)
-        .field("i2", &Face::i2)
-        .field("i3", &Face::i3);
+    value_array<Face>("Face")
+        .element(index<0>())
+        .element(index<1>())
+        .element(index<2>());
 
-    value_object<FaceSigned>("FaceSigned")
-        .field("i1", &FaceSigned::i1)
-        .field("i2", &FaceSigned::i2)
-        .field("i3", &FaceSigned::i3);
+    value_array<FaceSigned>("FaceSigned")
+        .element(index<0>())
+        .element(index<1>())
+        .element(index<2>());
 }
