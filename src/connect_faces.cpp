@@ -13,7 +13,7 @@
 std::tuple<int32_t, int32_t, int32_t> getIndexEquivFull(const std::vector<int32_t>& index_equivalances, const std::span<const Face>& indices, const int32_t face_idx)
 {
     const Face& face = indices[face_idx];
-    return { index_equivalances[face.i1], index_equivalances[face.i2], index_equivalances[face.i3] };
+    return { index_equivalances[face[0]], index_equivalances[face[1]], index_equivalances[face[2]] };
 }
 
 std::tuple<int32_t, int32_t, int32_t> getIndexEquivEmpty(const std::vector<int32_t>& index_equivalances, const std::span<const Face>& _, const int32_t face_idx)

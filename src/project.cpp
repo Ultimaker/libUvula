@@ -25,12 +25,12 @@ Face getFace(const std::span<const Face>& mesh_indices, const uint32_t face_inde
 
 Triangle3F getFaceTriangle(const std::span<const Point3F>& mesh_vertices, const Face& face)
 {
-    return Triangle3F(mesh_vertices[face.i1], mesh_vertices[face.i2], mesh_vertices[face.i3]);
+    return Triangle3F(mesh_vertices[face[0]], mesh_vertices[face[1]], mesh_vertices[face[2]]);
 }
 
 Triangle2F getFaceUv(const std::span<const Point2F>& mesh_uv, const Face& face)
 {
-    return Triangle2F{ mesh_uv[face.i1], mesh_uv[face.i2], mesh_uv[face.i3] };
+    return Triangle2F{ mesh_uv[face[0]], mesh_uv[face[1]], mesh_uv[face[2]] };
 }
 
 Point2F projectToViewport(const Point3F& point, const Matrix44F& matrix, const bool is_camera_perspective, const int viewport_width, const int viewport_height)
@@ -224,7 +224,7 @@ std::vector<Polygon> doProject(
         }
 
         const FaceSigned& connected_faces = mesh_faces_connectivity[candidate_face_id];
-        for (const int32_t connected_face : { connected_faces.i1, connected_faces.i2, connected_faces.i3 })
+        for (const int32_t connected_face : connected_faces)
         {
             if (connected_face >= 0 && ! processed_faces.contains(connected_face))
             {

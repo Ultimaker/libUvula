@@ -2,22 +2,24 @@
 
 #include "needs_supports.h"
 
-#include "geometry_utils.h"
-#include "Point3F.h"
-#include "Vector3F.h"
-
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <numeric>
+#include <set>
+#include <unordered_map>
+
 #include <range/v3/view/enumerate.hpp>
 #include <range/v3/view/iota.hpp>
-#include <unordered_map>
-#include <set>
+
+#include "Point3F.h"
+#include "Vector3F.h"
+#include "geometry_utils.h"
 
 std::tuple<const Point3F&, const Point3F&, const Point3F&> getVerticesFull(const std::span<const Point3F>& vertices, const std::span<const Face>& indices, const int32_t face_idx)
 {
     const Face& face = indices[face_idx];
-    return { vertices[face.i1], vertices[face.i2], vertices[face.i3] };
+    return { vertices[face[0]], vertices[face[1]], vertices[face[2]] };
 }
 
 std::tuple<const Point3F&, const Point3F&, const Point3F&> getVerticesEmpty(const std::span<const Point3F>& vertices, const std::span<const Face>& _, const int32_t face_idx)
@@ -56,7 +58,7 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
             continue;
         }
         const auto& face_norm = maybe_face_norm.value();
-        const bool norm_down = ((-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? asinf(face_norm.y()) : 0.0f) < 0.0f;
+        const bool norm_down = ((-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? std::asinf(face_norm.y()) : 0.0f) < 0.0f;
 
         // Mark each vertex as handled if the norm when that's up, otherwise check each edge.
         for (const auto& v : { a, b, c })
@@ -108,7 +110,7 @@ bool checkForDownFaces(
         const auto& face_norm = maybe_face_norm.value();
 
         // Check the angle.
-        const float angle = (-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? -asinf(face_norm.y()) : 0.0f;
+        const float angle = (-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? -std::asinf(face_norm.y()) : 0.0f;
         if (angle < support_angle)
         {
             continue;
@@ -136,7 +138,7 @@ bool checkForDownFaces(
         std::set<ptrdiff_t> res{face_idx};
         visited.insert(face_idx);
         const auto& nb_face_ids = mesh_connects[face_idx];
-        for (const auto& nb_face_idx : { nb_face_ids.i1, nb_face_ids.i2, nb_face_ids.i3 })
+        for (const auto& nb_face_idx : nb_face_ids)
         {
             if (nb_face_idx >= 0 && ! visited.contains(nb_face_idx) && candidate_overhangs.contains(nb_face_idx))
             {
