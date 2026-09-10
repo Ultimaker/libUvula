@@ -248,13 +248,25 @@ EMSCRIPTEN_BINDINGS(uvula)
         .function("y", &Vector3F::y)
         .function("z", &Vector3F::z);
 
-    value_array<Face>("Face")
-        .element(emscripten::index<0>())
-        .element(emscripten::index<1>())
-        .element(emscripten::index<2>());
+    value_object<Face>("Face")
+        .field("i1",
+               emscripten::optional_override([](const Face& self) -> uint32_t { return std::get<0>(self);} ),
+               emscripten::optional_override([](Face& self, const uint32_t value) -> void {std::get<0>(self) = value;} ))
+        .field("i2",
+               emscripten::optional_override([](const Face& self) -> uint32_t { return std::get<1>(self);} ),
+               emscripten::optional_override([](Face& self, const uint32_t value) -> void {std::get<1>(self) = value;} ))
+        .field("i3",
+               emscripten::optional_override([](const Face& self) -> uint32_t { return std::get<2>(self);} ),
+               emscripten::optional_override([](Face& self, const uint32_t value)-> void {std::get<2>(self) = value;} ));
 
-    value_array<FaceSigned>("FaceSigned")
-        .element(emscripten::index<0>())
-        .element(emscripten::index<1>())
-        .element(emscripten::index<2>());
+    value_object<FaceSigned>("FaceSigned")
+        .field("i1",
+               emscripten::optional_override([](const FaceSigned& self) -> int32_t { return std::get<0>(self);} ),
+               emscripten::optional_override([](FaceSigned& self, const int32_t value) -> void {std::get<0>(self) = value;} ))
+        .field("i2",
+               emscripten::optional_override([](const FaceSigned& self) -> int32_t { return std::get<1>(self);} ),
+               emscripten::optional_override([](FaceSigned& self, const int32_t value) -> void {std::get<1>(self) = value;} ))
+        .field("i3",
+               emscripten::optional_override([](const FaceSigned& self) -> int32_t { return std::get<2>(self);} ),
+               emscripten::optional_override([](FaceSigned& self, const int32_t value)-> void {std::get<2>(self) = value;} ));
 }
