@@ -155,6 +155,19 @@ std::vector<Polygon> toPolygons(const ClipperLib::Paths& paths)
     return result;
 }
 
+std::vector<Polygon> unionPolygons(const std::vector<Polygon>& polygons)
+{
+    ClipperLib::Paths uv_areas_path;
+    uv_areas_path.reserve(polygons.size());
+    for (const Polygon& polygon : polygons)
+    {
+        uv_areas_path.push_back(toPath(polygon));
+    }
+    uv_areas_path = unionPaths(uv_areas_path);
+
+    return toPolygons(uv_areas_path);
+}
+
 std::vector<Polygon> doProject(
     const std::span<Point2F>& stroke_polygon,
     const std::span<const Point3F>& mesh_vertices,
@@ -186,9 +199,9 @@ std::vector<Polygon> doProject(
 
         const Face face = getFace(mesh_indices, candidate_face_id);
         const Triangle3F face_triangle = getFaceTriangle(mesh_vertices, face);
-        const Vector3F face_normal = face_triangle.normal();
+        const std::optional<Vector3F> face_normal = face_triangle.normal();
 
-        if (face_normal.dot(camera_normal) < 0)
+        if (! face_normal.has_value() || face_normal->dot(camera_normal) < 0)
         {
             // Facing away from the viewer
             continue;
@@ -233,13 +246,80 @@ std::vector<Polygon> doProject(
         }
     }
 
-    ClipperLib::Paths uv_areas_path;
-    uv_areas_path.reserve(result.size());
-    for (const Polygon& polygon : result)
-    {
-        uv_areas_path.push_back(toPath(polygon));
-    }
-    uv_areas_path = unionPaths(uv_areas_path);
+    return unionPolygons(result);
+}
 
-    return toPolygons(uv_areas_path);
+std::vector<Polygon> doGetConnectedFaces(
+    const std::span<const Point3F>& mesh_vertices,
+    const std::span<const Face>& mesh_indices,
+    const std::span<const Point2F>& mesh_uv,
+    const std::span<const FaceSigned>& mesh_faces_connectivity,
+    const uint32_t texture_width,
+    const uint32_t texture_height,
+    const uint32_t face_id,
+    const double threshold_angle)
+{
+    constexpr double threshold_angle_limit = 0.02;
+    const double actual_threshold_angle = std::cos(std::max(threshold_angle, threshold_angle_limit));
+
+    const Face initial_face = getFace(mesh_indices, face_id);
+    const Triangle3F initial_triangle = getFaceTriangle(mesh_vertices, initial_face);
+    const std::optional<Vector3F> initial_face_normal = initial_triangle.normal();
+
+    if (! initial_face_normal.has_value())
+    {
+        return {};
+    }
+
+    std::vector<Polygon> result;
+    std::unordered_set<uint32_t> visited_faces;
+    std::queue<uint32_t> faces_to_visit;
+    faces_to_visit.push(face_id);
+    while (! faces_to_visit.empty())
+    {
+        const uint32_t current_face_id = faces_to_visit.front();
+        faces_to_visit.pop();
+
+        if (visited_faces.contains(current_face_id))
+        {
+            continue;
+        }
+
+        visited_faces.insert(current_face_id);
+
+        const Face current_face = getFace(mesh_indices, current_face_id);
+        const Triangle3F current_triangle = getFaceTriangle(mesh_vertices, current_face);
+        const std::optional<Vector3F> current_face_normal = current_triangle.normal();
+
+        if (! current_face_normal.has_value())
+        {
+            continue;
+        }
+
+        const double angle_cosine = std::abs(initial_face_normal->dot(*current_face_normal));
+        if (angle_cosine >= actual_threshold_angle)
+        {
+            // Add the polygon to the result
+            const Triangle2F current_uv = getFaceUv(mesh_uv, current_face);
+            Polygon current_polygon;
+            for (const Point2F& point_uv : { current_uv.p1, current_uv.p2, current_uv.p3 })
+            {
+                current_polygon.emplace_back(point_uv.x * texture_width, point_uv.y * texture_height);
+            }
+            result.push_back(std::move(current_polygon));
+
+            // Visit the connected faces
+            const FaceSigned& connected_faces = mesh_faces_connectivity[current_face_id];
+
+            for (int32_t connected_face_id : { connected_faces.i1, connected_faces.i2, connected_faces.i3 })
+            {
+                if (connected_face_id >= 0 && ! visited_faces.contains(connected_face_id))
+                {
+                    faces_to_visit.push(connected_face_id);
+                }
+            }
+        }
+    }
+
+    return unionPolygons(result);
 }
