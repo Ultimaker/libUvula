@@ -4,7 +4,9 @@
 #include <pybind11/pybind11.h>
 
 #include "Face.h"
+#include "connect_faces.h"
 #include "Matrix44F.h"
+#include "needs_supports.h"
 #include "Point2F.h"
 #include "Point3F.h"
 #include "Vector3F.h"
@@ -149,6 +151,51 @@ py::list pyGetConnectedFaces(
     return makePyPolygonsList(result);
 }
 
+py::array pyConnectFaces(const py::array_t<float>& vertices_array, const py::array_t<uint32_t>& indices_array)
+{
+    // Fetch/cast input.
+    pybind11::buffer_info mesh_vertices_buffer = vertices_array.request();
+    pybind11::buffer_info mesh_indices_buffer = indices_array.request();
+    const std::span<const Point3F> vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
+    const std::span<const Face> indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
+
+    // Define output shape.
+    const std::vector<py::ssize_t> shape = { static_cast<py::ssize_t>(indices.size()), 3 };
+    const std::vector<py::ssize_t> strides = { static_cast<py::ssize_t>(sizeof(int32_t) * shape[1]), static_cast<py::ssize_t>(sizeof(int32_t)) };
+    std::vector<FaceSigned> res(shape[0], { -1, -1, -1 });
+
+    // Do the actual calculation.
+    {
+        py::gil_scoped_release release;
+        connectFaces(vertices, indices, res);
+    }
+    return py::array(py::buffer_info(res.data(), strides[1], py::format_descriptor<int32_t>::format(), shape.size(), shape, strides));
+}
+
+py::bool_ pyCheckDownwardsFeatures(
+    const float support_angle,
+    const float close_to_buildplate_dist,
+    const float min_support_area,
+    const py::array_t<float>& vertices_array,
+    const py::array_t<uint32_t>& indices_array,
+    const py::array_t<int32_t>& mesh_faces_connectivity_array)
+{
+    pybind11::buffer_info mesh_vertices_buffer = vertices_array.request();
+    pybind11::buffer_info mesh_indices_buffer = indices_array.request();
+    pybind11::buffer_info mesh_faces_connectivity_buffer = mesh_faces_connectivity_array.request();
+    const std::span<const Point3F> vertices = std::span(static_cast<const Point3F*>(mesh_vertices_buffer.ptr), mesh_vertices_buffer.shape[0]);
+    const std::span<const Face> indices = std::span(static_cast<const Face*>(mesh_indices_buffer.ptr), mesh_indices_buffer.shape[0]);
+    const std::span<const FaceSigned> face_connects = std::span(static_cast<FaceSigned*>(mesh_faces_connectivity_buffer.ptr), mesh_faces_connectivity_buffer.shape[0]);
+
+    bool res = false;
+    {
+        py::gil_scoped_release release;
+        res = checkForDownVertices(close_to_buildplate_dist, vertices, indices)
+           || checkForDownFaces(support_angle, close_to_buildplate_dist, min_support_area, vertices, indices, face_connects);
+    }
+    return res;
+}
+
 PYBIND11_MODULE(pyUvula, module)
 {
     module.doc() = "UV-unwrapping library (or bindings to library), segmentation uses a classic normal-based grouping and charts packing uses xatlas";
@@ -156,5 +203,7 @@ PYBIND11_MODULE(pyUvula, module)
 
     module.def("unwrap", &pyUnwrap, "Given the vertices, indices of a mesh, unwrap UV for texture-coordinates.");
     module.def("project", &pyProject, "Projects a stroke polygon into an object texture.");
+    module.def("connectFaces", &pyConnectFaces, "Make a face-connectivity data-structure from raw vertices + indices input.");
+    module.def("checkDownwardsFeatures", &pyCheckDownwardsFeatures, "Checks for parts of a mesh that would be unsupported, given no supports.");
     module.def("getConnectedFaces", &pyGetConnectedFaces, "Gets the polygons of the faces connected to the given initial face.");
 }

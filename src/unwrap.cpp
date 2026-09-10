@@ -139,9 +139,9 @@ static std::vector<FaceData> makeFacesData(const std::vector<Point3F>& vertices,
 
     for (const auto& [index, face] : faces | ranges::views::enumerate)
     {
-        const Point3F& v1 = vertices[face.i1];
-        const Point3F& v2 = vertices[face.i2];
-        const Point3F& v3 = vertices[face.i3];
+        const Point3F& v1 = vertices[face[0]];
+        const Point3F& v2 = vertices[face[1]];
+        const Point3F& v3 = vertices[face[2]];
 
         const std::optional<Vector3F> triangle_normal = geometry_utils::triangleNormal(v1, v2, v3);
         if (triangle_normal.has_value())
@@ -208,7 +208,7 @@ static std::vector<std::vector<size_t>> makeCharts(const std::vector<Point3F>& v
         {
             faces_group.push_back(face_from_group->face_index);
 
-            for (const uint32_t vertex_index : { face_from_group->face->i1, face_from_group->face->i2, face_from_group->face->i3 })
+            for (const uint32_t vertex_index : *face_from_group->face)
             {
                 uv_coords[vertex_index] = axis_mat.project(vertices[vertex_index]);
             }
@@ -250,7 +250,7 @@ std::vector<std::vector<size_t>> splitNonLinkedFacesCharts(const std::vector<std
         {
             const Face& face = faces[face_index];
             std::set<size_t> assigned_groups;
-            std::array<AssignedVertex, 3> assigned_vertices = { AssignedVertex{ .index = face.i1 }, AssignedVertex{ .index = face.i2 }, AssignedVertex{ .index = face.i3 } };
+            std::array<AssignedVertex, 3> assigned_vertices = { AssignedVertex{ .index = face[0] }, AssignedVertex{ .index = face[1] }, AssignedVertex{ .index = face[2] } };
             for (AssignedVertex& assigned_vertex : assigned_vertices)
             {
                 auto iterator = new_indices_groups.find(assigned_vertex.index);
@@ -265,10 +265,10 @@ std::vector<std::vector<size_t>> splitNonLinkedFacesCharts(const std::vector<std
             {
                 // None of the points are assigned yet, just assign them to a new group
                 const size_t new_group_index = max_group_index++;
-                new_indices_groups[face.i1] = new_group_index;
-                new_indices_groups[face.i2] = new_group_index;
-                new_indices_groups[face.i3] = new_group_index;
-                new_groups_vertices[new_group_index] = { face.i1, face.i2, face.i3 };
+                new_indices_groups[face[0]] = new_group_index;
+                new_indices_groups[face[1]] = new_group_index;
+                new_indices_groups[face[2]] = new_group_index;
+                new_groups_vertices[new_group_index] = { face[0], face[1], face[2] };
             }
             else
             {
@@ -308,7 +308,7 @@ std::vector<std::vector<size_t>> splitNonLinkedFacesCharts(const std::vector<std
         for (const size_t face_index : faces_group)
         {
             const Face& face = faces[face_index];
-            new_faces_groups[new_indices_groups[face.i1]].push_back(face_index);
+            new_faces_groups[new_indices_groups[face[0]]].push_back(face_index);
         }
 
         for (const std::vector<size_t>& faces_indices : new_faces_groups | ranges::views::values)
@@ -350,7 +350,7 @@ std::vector<Face> groupSimilarVertices(const std::vector<Face>& faces, const std
 
     for (const Face& face : faces)
     {
-        faces_with_similar_indices.push_back(Face{ new_vertices_indices[face.i1], new_vertices_indices[face.i2], new_vertices_indices[face.i3] });
+        faces_with_similar_indices.push_back(Face{ new_vertices_indices[face[0]], new_vertices_indices[face[1]], new_vertices_indices[face[2]] });
     }
 
     return faces_with_similar_indices;

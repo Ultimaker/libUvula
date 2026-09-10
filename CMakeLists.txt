@@ -28,6 +28,8 @@ set(UVULA_SRC
         src/xatlas.cpp
         src/unwrap.cpp
         src/project.cpp
+        src/connect_faces.cpp
+        src/needs_supports.cpp
         src/Vector3F.cpp
         src/Vector2F.cpp
         src/Matrix33F.cpp

@@ -2,34 +2,14 @@
 
 #pragma once
 
+#include <array>
+
 #include "Point3F.h"
 #include "Vector3F.h"
 
-class Triangle3F
+class Triangle3F : public std::array<Point3F, 3>
 {
 public:
-    explicit Triangle3F(const Point3F& p1, const Point3F& p2, const Point3F& p3);
-
-    [[nodiscard]] const Point3F& p1() const
-    {
-        return p1_;
-    };
-
-    [[nodiscard]] const Point3F& p2() const
-    {
-        return p2_;
-    }
-
-    [[nodiscard]] const Point3F& p3() const
-    {
-        return p3_;
-    }
-
     /*! @return The unitary normal of this triangle, or nullopt if it is degenerate */
     [[nodiscard]] std::optional<Vector3F> normal() const;
-
-private:
-    Point3F p1_;
-    Point3F p2_;
-    Point3F p3_;
 };
