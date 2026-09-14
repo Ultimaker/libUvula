@@ -29,6 +29,11 @@ Vector3F Vector3F::cross(const Vector3F& other) const
     return Vector3F((y_ * other.z_) - (z_ * other.y_), (z_ * other.x_) - (x_ * other.z_), (x_ * other.y_) - (y_ * other.x_));
 }
 
+Vector3F Vector3F::abs() const
+{
+    return Vector3F(std::abs(x_), std::abs(y_), std::abs(z_));
+}
+
 Vector3F Vector3F::operator+(const Vector3F& other) const
 {
     return Vector3F(x_ + other.x_, y_ + other.y_, z_ + other.z_);

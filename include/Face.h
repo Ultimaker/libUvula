@@ -2,15 +2,11 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 template<typename IndexType>
-struct FaceIndex
-{
-    IndexType i1{ 0 };
-    IndexType i2{ 0 };
-    IndexType i3{ 0 };
-};
+using FaceIndex = std::array<IndexType, 3>;
 
 using Face = FaceIndex<uint32_t>;
 

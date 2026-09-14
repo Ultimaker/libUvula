@@ -4,9 +4,4 @@
 
 #include "Point2F.h"
 
-struct Triangle2F
-{
-    Point2F p1;
-    Point2F p2;
-    Point2F p3;
-};
+using Triangle2F = std::array<Point2F, 3>;
