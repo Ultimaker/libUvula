@@ -58,7 +58,7 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
             continue;
         }
         const auto& face_norm = maybe_face_norm.value();
-        const bool norm_down = ((-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? std::asinf(face_norm.y()) : 0.0f) < 0.0f;
+        const bool norm_down = ((-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? std::asin(face_norm.y()) : 0.0f) < 0.0f;
 
         // Mark each vertex as handled if the norm when that's up, otherwise check each edge.
         for (const auto& v : { a, b, c })
@@ -110,7 +110,7 @@ bool checkForDownFaces(
         const auto& face_norm = maybe_face_norm.value();
 
         // Check the angle.
-        const float angle = (-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? -std::asinf(face_norm.y()) : 0.0f;
+        const float angle = (-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? -std::asin(face_norm.y()) : 0.0f;
         if (angle < support_angle)
         {
             continue;
