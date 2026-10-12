@@ -134,7 +134,6 @@ bool checkForDownFaces(
     }
 
     std::set<ptrdiff_t> visited;
-    // NOTE: Iterative on purpose, a recursive flood-fill overflows the stack on large connected overhang areas.
     const auto collect_neighbours_func = [&](const ptrdiff_t& start_face_idx)
     {
         std::set<ptrdiff_t> res;
