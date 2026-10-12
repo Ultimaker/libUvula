@@ -134,7 +134,7 @@ bool checkForDownFaces(
     }
 
     std::set<ptrdiff_t> visited;
-    const auto collect_neighbours_func = [&](const ptrdiff_t& start_face_idx)
+    const auto collect_neighbours_func = [&visited, &candidate_overhangs, &mesh_connects](const ptrdiff_t& start_face_idx)
     {
         std::set<ptrdiff_t> res;
         std::vector<ptrdiff_t> to_visit{ start_face_idx };
