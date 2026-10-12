@@ -136,14 +136,14 @@ bool checkForDownFaces(
     std::set<ptrdiff_t> visited;
     const auto collect_neighbours_func = [&visited, &candidate_overhangs, &mesh_connects](const ptrdiff_t& start_face_idx)
     {
-        std::set<ptrdiff_t> res;
+        std::set<ptrdiff_t> collected_neighbours;
         std::vector<ptrdiff_t> to_visit{ start_face_idx };
         visited.insert(start_face_idx);
         while (! to_visit.empty())
         {
             const ptrdiff_t face_idx = to_visit.back();
             to_visit.pop_back();
-            res.insert(face_idx);
+            collected_neighbours.insert(face_idx);
             for (const auto& nb_face_idx : mesh_connects[face_idx])
             {
                 if (nb_face_idx >= 0 && ! visited.contains(nb_face_idx) && candidate_overhangs.contains(nb_face_idx))
@@ -153,7 +153,7 @@ bool checkForDownFaces(
                 }
             }
         }
-        return res;
+        return collected_neighbours;
     };
 
     // Is there a big enough area that needs to be supported?
