@@ -6,9 +6,9 @@
 #include <array>
 #include <cmath>
 #include <numeric>
+#include <queue>
 #include <set>
 #include <unordered_map>
-#include <vector>
 
 #include <range/v3/view/enumerate.hpp>
 #include <range/v3/view/iota.hpp>
@@ -137,19 +137,20 @@ bool checkForDownFaces(
     const auto collect_neighbours_func = [&visited, &candidate_overhangs, &mesh_connects](const ptrdiff_t& start_face_idx)
     {
         std::set<ptrdiff_t> collected_neighbours;
-        std::vector<ptrdiff_t> to_visit{ start_face_idx };
+        std::queue<ptrdiff_t> to_visit;
+        to_visit.push(start_face_idx);
         visited.insert(start_face_idx);
         while (! to_visit.empty())
         {
-            const ptrdiff_t face_idx = to_visit.back();
-            to_visit.pop_back();
+            const ptrdiff_t face_idx = to_visit.front();
+            to_visit.pop();
             collected_neighbours.insert(face_idx);
             for (const auto& nb_face_idx : mesh_connects[face_idx])
             {
                 if (nb_face_idx >= 0 && ! visited.contains(nb_face_idx) && candidate_overhangs.contains(nb_face_idx))
                 {
                     visited.insert(nb_face_idx);
-                    to_visit.push_back(nb_face_idx);
+                    to_visit.push(nb_face_idx);
                 }
             }
         }
