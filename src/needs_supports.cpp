@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <numeric>
+#include <queue>
 #include <set>
 #include <unordered_map>
 
@@ -133,20 +134,27 @@ bool checkForDownFaces(
     }
 
     std::set<ptrdiff_t> visited;
-    const std::function<std::set<ptrdiff_t>(const ptrdiff_t&)> collect_neighbours_func = [&](const ptrdiff_t& face_idx)
+    const auto collect_neighbours_func = [&visited, &candidate_overhangs, &mesh_connects](const ptrdiff_t& start_face_idx)
     {
-        std::set<ptrdiff_t> res{face_idx};
-        visited.insert(face_idx);
-        const auto& nb_face_ids = mesh_connects[face_idx];
-        for (const auto& nb_face_idx : nb_face_ids)
+        std::set<ptrdiff_t> collected_neighbours;
+        std::queue<ptrdiff_t> to_visit;
+        to_visit.push(start_face_idx);
+        visited.insert(start_face_idx);
+        while (! to_visit.empty())
         {
-            if (nb_face_idx >= 0 && ! visited.contains(nb_face_idx) && candidate_overhangs.contains(nb_face_idx))
+            const ptrdiff_t face_idx = to_visit.front();
+            to_visit.pop();
+            collected_neighbours.insert(face_idx);
+            for (const auto& nb_face_idx : mesh_connects[face_idx])
             {
-                const auto res_nb = collect_neighbours_func(nb_face_idx);
-                res.insert(res_nb.begin(), res_nb.end());
+                if (nb_face_idx >= 0 && ! visited.contains(nb_face_idx) && candidate_overhangs.contains(nb_face_idx))
+                {
+                    visited.insert(nb_face_idx);
+                    to_visit.push(nb_face_idx);
+                }
             }
         }
-        return res;
+        return collected_neighbours;
     };
 
     // Is there a big enough area that needs to be supported?
