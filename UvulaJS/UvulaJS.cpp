@@ -1,7 +1,12 @@
 // (c) 2025, UltiMaker -- see LICENCE for details
 
+#include <algorithm>
+#include <array>
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
+#include <emscripten/wire.h>
+#include <span>
+#include <type_traits>
 #include <vector>
 
 #include "Face.h"
@@ -13,6 +18,70 @@
 #include "unwrap.h"
 
 using namespace emscripten;
+
+static_assert(sizeof(Point2F) == 2 * sizeof(float) && std::is_trivially_copyable_v<Point2F>);
+static_assert(sizeof(Point3F) == 3 * sizeof(float) && std::is_trivially_copyable_v<Point3F>);
+static_assert(sizeof(Face) == 3 * sizeof(uint32_t) && std::is_trivially_copyable_v<Face>);
+static_assert(sizeof(FaceSigned) == 3 * sizeof(int32_t) && std::is_trivially_copyable_v<FaceSigned>);
+
+namespace
+{
+template <typename Scalar>
+    requires std::is_arithmetic_v<Scalar>
+void copyJsArrayToSpan(const emscripten::val& source_js, size_t source_len, std::span<Scalar> dest)
+{
+    if (dest.empty())
+    {
+        return;
+    }
+    emscripten::val view = emscripten::val(emscripten::typed_memory_view(dest.size(), dest.data()));
+    if (source_len > dest.size())
+    {
+        emscripten::val truncated = !source_js["subarray"].isUndefined()
+            ? source_js.call<emscripten::val>("subarray", size_t(0), dest.size())
+            : source_js.call<emscripten::val>("slice", size_t(0), dest.size());
+        view.call<void>("set", truncated);
+    }
+    else
+    {
+        view.call<void>("set", source_js);
+    }
+}
+
+template <typename Elem, typename Scalar, size_t Arity>
+    requires (std::is_trivially_copyable_v<Elem> && std::is_arithmetic_v<Scalar> && sizeof(Elem) == Arity * sizeof(Scalar))
+std::vector<Elem> copyTypedArrayToVector(const emscripten::val& source_js)
+{
+    const auto source_len = source_js["length"].as<size_t>();
+    const size_t elem_count = source_len / Arity;
+    std::vector<Elem> result(elem_count);
+    copyJsArrayToSpan(
+        source_js,
+        source_len,
+        std::span<Scalar>{ reinterpret_cast<Scalar*>(result.data()), elem_count * Arity });
+    return result;
+}
+
+std::vector<Point3F> copyFloat32ArrayToPoints3F(const emscripten::val& vertices_js)
+{
+    return copyTypedArrayToVector<Point3F, float, 3>(vertices_js);
+}
+
+std::vector<Face> copyUint32ArrayToFaces(const emscripten::val& indices_js)
+{
+    return copyTypedArrayToVector<Face, uint32_t, 3>(indices_js);
+}
+
+std::vector<Point2F> copyFloat32ArrayToPoints2F(const emscripten::val& uvs_js)
+{
+    return copyTypedArrayToVector<Point2F, float, 2>(uvs_js);
+}
+
+std::vector<FaceSigned> copyInt32ArrayToConnectivity(const emscripten::val& connectivity_js)
+{
+    return copyTypedArrayToVector<FaceSigned, int32_t, 3>(connectivity_js);
+}
+} // namespace
 
 // TypeScript type aliases for better type safety
 EMSCRIPTEN_DECLARE_VAL_TYPE(Float32Array);
@@ -37,46 +106,11 @@ struct Geometry
     std::vector<FaceSigned> connectivity;
 
     Geometry(const Float32Array& vertices_js, const Uint32Array& indices_js, const Float32Array& uvs_js, const Int32Array& connectivity_js)
+        : vertices(copyFloat32ArrayToPoints3F(vertices_js))
+        , indices(copyUint32ArrayToFaces(indices_js))
+        , uvs(copyFloat32ArrayToPoints2F(uvs_js))
+        , connectivity(copyInt32ArrayToConnectivity(connectivity_js))
     {
-        // Convert vertices
-        auto vertices_length = vertices_js["length"].as<int>();
-        vertices.reserve(vertices_length / 3);
-        for (int i = 0; i < vertices_length; i += 3) {
-            auto x = vertices_js[i].as<float>();
-            auto y = vertices_js[i + 1].as<float>();
-            auto z = vertices_js[i + 2].as<float>();
-            vertices.emplace_back(x, y, z);
-        }
-
-        // Convert indices
-        auto indices_length = indices_js["length"].as<int>();
-        indices.reserve(indices_length / 3);
-        for (int i = 0; i < indices_length; i += 3)
-        {
-            auto i1 = indices_js[i].as<uint32_t>();
-            auto i2 = indices_js[i + 1].as<uint32_t>();
-            auto i3 = indices_js[i + 2].as<uint32_t>();
-            indices.push_back({i1, i2, i3});
-        }
-
-        // Convert UVs
-        auto uvs_length = uvs_js["length"].as<int>();
-        uvs.reserve(uvs_length / 2);
-        for (int i = 0; i < uvs_length; i += 2) {
-            auto u = uvs_js[i].as<float>();
-            auto v = uvs_js[i + 1].as<float>();
-            uvs.emplace_back(u, v);
-        }
-
-        // Convert connectivity
-        auto connectivity_length = connectivity_js["length"].as<int>();
-        connectivity.reserve(connectivity_length / 3);
-        for (int i = 0; i < connectivity_length; i += 3) {
-            auto i1 = connectivity_js[i].as<int32_t>();
-            auto i2 = connectivity_js[i + 1].as<int32_t>();
-            auto i3 = connectivity_js[i + 2].as<int32_t>();
-            connectivity.push_back({i1, i2, i3});
-        }
     }
 };
 
@@ -88,32 +122,9 @@ std::string get_uvula_info()
 // Typed wrapper functions for better TypeScript generation
 UnwrapResult unwrap(const Float32Array& vertices_js, const Uint32Array& indices_js)
 {
-    // Convert JavaScript arrays to C++ vectors
-    std::vector<Point3F> vertex_points;
-    std::vector<Face> face_indices;
-
-    // Get array lengths
-    unsigned vertices_length = vertices_js["length"].as<unsigned>();
-    unsigned indices_length = indices_js["length"].as<unsigned>();
-
-    // Convert vertices (expecting flat array of [x1, y1, z1, x2, y2, z2, ...])
-    vertex_points.reserve(vertices_length / 3);
-    for (unsigned i = 0; i < vertices_length; i += 3) {
-        float x = vertices_js[i].as<float>();
-        float y = vertices_js[i + 1].as<float>();
-        float z = vertices_js[i + 2].as<float>();
-        vertex_points.emplace_back(x, y, z);
-    }
-
-    // Convert indices (expecting flat array of [i1, i2, i3, i4, i5, i6, ...])
-    face_indices.reserve(indices_length / 3);
-    for (unsigned i = 0; i < indices_length; i += 3)
-    {
-        uint32_t i1 = indices_js[i].as<uint32_t>();
-        uint32_t i2 = indices_js[i + 1].as<uint32_t>();
-        uint32_t i3 = indices_js[i + 2].as<uint32_t>();
-        face_indices.push_back({i1, i2, i3});
-    }
+    // Convert JavaScript TypedArrays to C++ vectors using bulk memory views
+    std::vector<Point3F> vertex_points = copyFloat32ArrayToPoints3F(vertices_js);
+    std::vector<Face> face_indices = copyUint32ArrayToFaces(indices_js);
 
     // Prepare output
     std::vector<Point2F> uv_coords(vertex_points.size(), {0.0f, 0.0f});
@@ -128,13 +139,10 @@ UnwrapResult unwrap(const Float32Array& vertices_js, const Uint32Array& indices_
         throw std::runtime_error("Couldn't unwrap UVs!");
     }
 
-    // Convert result to structured return type
-    emscripten::val uv_array = emscripten::val::global("Float32Array").new_(uv_coords.size() * 2);
-    for (size_t i = 0; i < uv_coords.size(); ++i)
-    {
-        uv_array.set(i * 2, uv_coords[i].x);
-        uv_array.set(i * 2 + 1, uv_coords[i].y);
-    }
+    // Copy flat Point2F buffer into a JS Float32Array in a single bulk operation
+    emscripten::val uv_view = emscripten::val(
+        emscripten::typed_memory_view(uv_coords.size() * 2, reinterpret_cast<const float*>(uv_coords.data())));
+    emscripten::val uv_array = emscripten::val::global("Float32Array").new_(uv_view);
 
     return UnwrapResult{
         .uvCoordinates = Float32Array{uv_array},
@@ -156,19 +164,17 @@ PolygonArray project(
     uint32_t face_id
 )
 {
-    std::vector<Point2F> stroke_points;
-    auto stroke_length = stroke_polygon_js["length"].as<int>();
-    stroke_points.reserve(stroke_length / 2);
-    for (int i = 0; i < stroke_length; i += 2) {
-        auto x = stroke_polygon_js[i].as<float>();
-        auto y = stroke_polygon_js[i + 1].as<float>();
-        stroke_points.push_back({x, y});
-    }
+    std::vector<Point2F> stroke_points = copyFloat32ArrayToPoints2F(stroke_polygon_js);
 
     // Convert camera projection matrix (4x4 matrix as flat array)
-    float matrix_data[4][4];
-    for (int i = 0; i < 16; ++i) {
-        matrix_data[i % 4][i / 4] = camera_projection_matrix_js[i].as<float>();
+    const size_t source_matrix_len = camera_projection_matrix_js["length"].as<size_t>();
+    const size_t matrix_len = std::min<size_t>(16, source_matrix_len);
+    std::array<float, 16> raw_matrix{};
+    copyJsArrayToSpan(camera_projection_matrix_js, source_matrix_len, std::span<float>{ raw_matrix }.first(matrix_len));
+    float matrix_data[4][4]{};
+    for (size_t i = 0; i < matrix_len; ++i)
+    {
+        matrix_data[i % 4][i / 4] = raw_matrix[i];
     }
     Matrix44F projection_matrix(matrix_data);
 
