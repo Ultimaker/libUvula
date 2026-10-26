@@ -3,13 +3,14 @@
 #include "unwrap.h"
 
 #include <algorithm>
-#include <map>
+#include <limits>
+#include <memory>
 #include <numeric>
-#include <set>
+#include <span>
+#include <unordered_map>
 
 #include <range/v3/algorithm/partition.hpp>
 #include <range/v3/view/enumerate.hpp>
-#include <range/v3/view/map.hpp>
 #include <spdlog/spdlog.h>
 
 #include "Matrix33F.h"
@@ -25,6 +26,7 @@ struct FaceData
     const Face* face;
     size_t face_index;
     Vector3F normal;
+    float best_angle = std::numeric_limits<float>::lowest();
 };
 
 /*!
@@ -32,7 +34,7 @@ struct FaceData
  * @param faces_data The faces data
  * @return A list of normals that are far enough from each other
  */
-std::vector<Vector3F> calculateProjectionNormals(const std::vector<FaceData>& faces_data)
+std::vector<Vector3F> calculateProjectionNormals(std::span<FaceData> faces_data)
 {
     constexpr float group_angle_limit = 20.0;
 
@@ -40,22 +42,22 @@ std::vector<Vector3F> calculateProjectionNormals(const std::vector<FaceData>& fa
     const float group_angle_limit_half_cos = std::cos(geometry_utils::deg2rad(group_angle_limit / 2));
 
     // First group will be based on the normal of the very first face
-    const Vector3F* project_normal = &faces_data.front().normal;
+    Vector3F project_normal = faces_data.front().normal;
 
     std::vector<Vector3F> projection_normals;
 
     // Create an internal list containing pointers to all the faces data, it will be reorganized
-    std::vector<const FaceData*> faces_to_process(faces_data.size());
+    std::vector<FaceData*> faces_to_process(faces_data.size());
     std::transform(
         faces_data.begin(),
         faces_data.end(),
         faces_to_process.begin(),
-        [](const FaceData& face_data)
+        [](FaceData& face_data) noexcept
         {
             return &face_data;
         });
 
-    using FaceDataIterator = std::vector<const FaceData*>::iterator;
+    using FaceDataIterator = std::vector<FaceData*>::iterator;
     struct FaceDataRange
     {
         FaceDataIterator begin;
@@ -73,9 +75,9 @@ std::vector<Vector3F> calculateProjectionNormals(const std::vector<FaceData>& fa
         current_faces_group.end = ranges::partition(
             unprocessed_faces.begin,
             unprocessed_faces.end,
-            [&project_normal, &group_angle_limit_half_cos](const FaceData* face_data)
+            [&project_normal, group_angle_limit_half_cos](const FaceData* face_data)
             {
-                return face_data->normal.dot(*project_normal) > group_angle_limit_half_cos;
+                return face_data->normal.dot(project_normal) > group_angle_limit_half_cos;
             });
 
         // All the faces placed to the current group are now no more in the unprocessed faces
@@ -85,12 +87,13 @@ std::vector<Vector3F> calculateProjectionNormals(const std::vector<FaceData>& fa
         Vector3F summed_normals = std::accumulate(
             current_faces_group.begin,
             current_faces_group.end,
-            *project_normal,
+            project_normal,
             [](const Vector3F& normal, const FaceData* face_data)
             {
                 return normal + face_data->normal;
             });
-        if (summed_normals.normalize()) [[likely]]
+        const bool added_normal = summed_normals.normalize();
+        if (added_normal) [[likely]]
         {
             projection_normals.push_back(summed_normals);
         }
@@ -99,25 +102,39 @@ std::vector<Vector3F> calculateProjectionNormals(const std::vector<FaceData>& fa
         float best_outlier_angle = std::numeric_limits<float>::max();
         FaceDataIterator best_outlier_face = faces_to_process.end();
 
-        for (auto iterator = unprocessed_faces.begin; iterator != unprocessed_faces.end; ++iterator)
+        if (added_normal) [[likely]]
         {
-            float face_best_angle = std::numeric_limits<float>::lowest();
-            for (const Vector3F& projection_normal : projection_normals)
+            const Vector3F& latest_normal = projection_normals.back();
+            for (auto iterator = unprocessed_faces.begin; iterator != unprocessed_faces.end; ++iterator)
             {
-                face_best_angle = std::max(face_best_angle, projection_normal.dot((*iterator)->normal));
-            }
+                FaceData* face_data = *iterator;
+                const float face_best_angle = std::max(face_data->best_angle, latest_normal.dot(face_data->normal));
+                face_data->best_angle = face_best_angle;
 
-            if (face_best_angle < best_outlier_angle)
+                if (face_best_angle < best_outlier_angle)
+                {
+                    best_outlier_angle = face_best_angle;
+                    best_outlier_face = iterator;
+                }
+            }
+        }
+        else
+        {
+            for (auto iterator = unprocessed_faces.begin; iterator != unprocessed_faces.end; ++iterator)
             {
-                best_outlier_angle = face_best_angle;
-                best_outlier_face = iterator;
+                const float face_best_angle = (*iterator)->best_angle;
+                if (face_best_angle < best_outlier_angle)
+                {
+                    best_outlier_angle = face_best_angle;
+                    best_outlier_face = iterator;
+                }
             }
         }
 
         if (best_outlier_angle < group_angle_limit_cos)
         {
             // Take the normal of the best outlier as the base for the iteration of the next group
-            project_normal = &(*best_outlier_face)->normal;
+            project_normal = (*best_outlier_face)->normal;
 
             // Remove the faces from the unprocessed faces
             std::iter_swap(best_outlier_face, unprocessed_faces.begin);
@@ -163,7 +180,7 @@ static std::vector<FaceData> makeFacesData(const std::vector<Point3F>& vertices,
  */
 static std::vector<std::vector<size_t>> makeCharts(const std::vector<Point3F>& vertices, const std::vector<Face>& faces, std::vector<Point2F>& uv_coords)
 {
-    const std::vector<FaceData> faces_data = makeFacesData(vertices, faces);
+    std::vector<FaceData> faces_data = makeFacesData(vertices, faces);
     if (faces_data.empty()) [[unlikely]]
     {
         return {};
@@ -177,34 +194,40 @@ static std::vector<std::vector<size_t>> makeCharts(const std::vector<Point3F>& v
     }
 
     // For each face, find the best projection normal and make groups
-    std::map<const Vector3F*, std::vector<const FaceData*>> projected_faces_groups;
+    std::vector<std::vector<const FaceData*>> projected_faces_groups(project_normal_array.size());
     for (const FaceData& face_data : faces_data)
     {
-        const Vector3F* best_projection_normal = nullptr;
+        size_t best_normal_index = 0;
         float angle_best = std::numeric_limits<float>::lowest();
 
-        for (const Vector3F& projection_normal : project_normal_array)
+        for (size_t i = 0; i < project_normal_array.size(); ++i)
         {
-            const float angle = face_data.normal.dot(projection_normal);
+            const float angle = face_data.normal.dot(project_normal_array[i]);
             if (angle > angle_best)
             {
                 angle_best = angle;
-                best_projection_normal = &projection_normal;
+                best_normal_index = i;
             }
         }
 
-        projected_faces_groups[best_projection_normal].push_back(&face_data);
+        projected_faces_groups[best_normal_index].push_back(&face_data);
     }
 
     // Now project each faces according to the closest matching normal and create indices groups
     std::vector<std::vector<size_t>> grouped_faces_indices;
-    for (const auto& [normal, faces_data] : projected_faces_groups)
+    grouped_faces_indices.reserve(project_normal_array.size());
+    for (size_t i = 0; i < project_normal_array.size(); ++i)
     {
-        const Matrix33F axis_mat = Matrix33F::makeOrthogonalBasis(*normal);
+        const std::vector<const FaceData*>& group_faces = projected_faces_groups[i];
+        if (group_faces.empty())
+        {
+            continue;
+        }
+        const Matrix33F axis_mat = Matrix33F::makeOrthogonalBasis(project_normal_array[i]);
         std::vector<size_t> faces_group;
-        faces_group.reserve(faces_data.size());
+        faces_group.reserve(group_faces.size());
 
-        for (const FaceData* face_from_group : faces_data)
+        for (const FaceData* face_from_group : group_faces)
         {
             faces_group.push_back(face_from_group->face_index);
 
@@ -231,90 +254,112 @@ static std::vector<std::vector<size_t>> makeCharts(const std::vector<Point3F>& v
 std::vector<std::vector<size_t>> splitNonLinkedFacesCharts(const std::vector<std::vector<size_t>>& grouped_faces, const std::vector<Face>& faces)
 {
     std::vector<std::vector<size_t>> result;
-
-    struct AssignedVertex
+    if (grouped_faces.empty() || faces.empty())
     {
-        uint32_t index;
-        bool assigned;
+        return result;
+    }
+
+    uint32_t max_vertex_index = 0;
+    for (const Face& face : faces)
+    {
+        max_vertex_index = std::max({ max_vertex_index, face[0], face[1], face[2] });
+    }
+
+    constexpr size_t unassigned = std::numeric_limits<size_t>::max();
+    std::vector<size_t> vertex_group(static_cast<size_t>(max_vertex_index) + 1, unassigned);
+    std::vector<size_t> parent;
+    std::vector<std::vector<size_t>> new_faces_groups;
+
+    auto find_root = [&parent](size_t g) noexcept -> size_t
+    {
+        while (parent[g] != g)
+        {
+            parent[g] = parent[parent[g]];
+            g = parent[g];
+        }
+        return g;
     };
 
     for (const std::vector<size_t>& faces_group : grouped_faces)
     {
-        size_t max_group_index = 0; // Incrementing group index
-
-        // Keep a double cache so that we can find very quickly the group of a vertex, and all the vertices from a group
-        std::map<size_t, size_t> new_indices_groups; // vertex_index: group_index
-        std::map<size_t, std::set<size_t>> new_groups_vertices; // group_index: [vertex_index]
+        parent.clear();
 
         for (const size_t face_index : faces_group)
         {
             const Face& face = faces[face_index];
-            std::set<size_t> assigned_groups;
-            std::array<AssignedVertex, 3> assigned_vertices = { AssignedVertex{ .index = face[0] }, AssignedVertex{ .index = face[1] }, AssignedVertex{ .index = face[2] } };
-            for (AssignedVertex& assigned_vertex : assigned_vertices)
+            size_t target_group = unassigned;
+            size_t g0 = vertex_group[face[0]];
+            size_t g1 = vertex_group[face[1]];
+            size_t g2 = vertex_group[face[2]];
+
+            if (g0 != unassigned)
             {
-                auto iterator = new_indices_groups.find(assigned_vertex.index);
-                assigned_vertex.assigned = iterator != new_indices_groups.end();
-                if (assigned_vertex.assigned)
-                {
-                    assigned_groups.insert(iterator->second);
-                }
+                g0 = find_root(g0);
+                target_group = g0;
+            }
+            if (g1 != unassigned)
+            {
+                g1 = find_root(g1);
+                target_group = std::min(target_group, g1);
+            }
+            if (g2 != unassigned)
+            {
+                g2 = find_root(g2);
+                target_group = std::min(target_group, g2);
             }
 
-            if (assigned_groups.empty())
+            if (target_group == unassigned)
             {
-                // None of the points are assigned yet, just assign them to a new group
-                const size_t new_group_index = max_group_index++;
-                new_indices_groups[face[0]] = new_group_index;
-                new_indices_groups[face[1]] = new_group_index;
-                new_indices_groups[face[2]] = new_group_index;
-                new_groups_vertices[new_group_index] = { face[0], face[1], face[2] };
+                const size_t new_group_index = parent.size();
+                parent.push_back(new_group_index);
+                vertex_group[face[0]] = new_group_index;
+                vertex_group[face[1]] = new_group_index;
+                vertex_group[face[2]] = new_group_index;
             }
             else
             {
-                const size_t target_group = *assigned_groups.begin();
-                std::set<size_t>& target_group_vertices = new_groups_vertices[target_group];
-
-                std::set<size_t> source_groups = assigned_groups;
-                source_groups.erase(source_groups.begin());
-
-                // First assign vertices that are not assigned yet
-                for (const AssignedVertex& assigned_vertex : assigned_vertices)
+                if (g0 != unassigned && g0 != target_group)
                 {
-                    if (! assigned_vertex.assigned)
-                    {
-                        new_indices_groups[assigned_vertex.index] = target_group;
-                        target_group_vertices.insert(assigned_vertex.index);
-                    }
+                    parent[g0] = target_group;
                 }
-
-                // Now merge source groups to the target group, including actually processed vertices
-                for (const size_t source_group : source_groups)
+                if (g1 != unassigned && g1 != target_group)
                 {
-                    auto it_source_group = new_groups_vertices.find(source_group);
-                    for (const size_t vertex_from_source_group : it_source_group->second)
-                    {
-                        size_t& vertex_group = new_indices_groups[vertex_from_source_group];
-                        vertex_group = target_group;
-                        target_group_vertices.insert(vertex_from_source_group);
-                    }
-
-                    new_groups_vertices.erase(it_source_group);
+                    parent[g1] = target_group;
                 }
+                if (g2 != unassigned && g2 != target_group)
+                {
+                    parent[g2] = target_group;
+                }
+                vertex_group[face[0]] = target_group;
+                vertex_group[face[1]] = target_group;
+                vertex_group[face[2]] = target_group;
             }
         }
 
-        std::map<size_t, std::vector<size_t>> new_faces_groups; // group_index: [face_index]
+        new_faces_groups.resize(parent.size());
         for (const size_t face_index : faces_group)
         {
             const Face& face = faces[face_index];
-            new_faces_groups[new_indices_groups[face[0]]].push_back(face_index);
+            const size_t root_group = find_root(vertex_group[face[0]]);
+            new_faces_groups[root_group].push_back(face_index);
         }
 
-        for (const std::vector<size_t>& faces_indices : new_faces_groups | ranges::views::values)
+        for (const size_t face_index : faces_group)
         {
-            result.push_back(faces_indices);
+            const Face& face = faces[face_index];
+            vertex_group[face[0]] = unassigned;
+            vertex_group[face[1]] = unassigned;
+            vertex_group[face[2]] = unassigned;
         }
+
+        for (std::vector<size_t>& faces_indices : new_faces_groups)
+        {
+            if (! faces_indices.empty())
+            {
+                result.push_back(std::move(faces_indices));
+            }
+        }
+        new_faces_groups.clear();
     }
 
     return result;
@@ -330,22 +375,15 @@ std::vector<std::vector<size_t>> splitNonLinkedFacesCharts(const std::vector<std
 std::vector<Face> groupSimilarVertices(const std::vector<Face>& faces, const std::vector<Point3F>& vertices)
 {
     std::vector<Face> faces_with_similar_indices;
-    std::map<Point3F, size_t> unique_vertices_indices;
+    faces_with_similar_indices.reserve(faces.size());
+    std::unordered_map<Point3F, uint32_t> unique_vertices_indices;
+    unique_vertices_indices.reserve(vertices.size() / 4 + 1);
     std::vector<uint32_t> new_vertices_indices(vertices.size());
 
     for (const auto [index, vertex] : vertices | ranges::views::enumerate)
     {
-        auto iterator = unique_vertices_indices.find(vertex);
-        if (iterator == unique_vertices_indices.end())
-        {
-            // This is the very first time we see this position, register it
-            unique_vertices_indices[vertex] = index;
-            new_vertices_indices[index] = index;
-        }
-        else
-        {
-            new_vertices_indices[index] = iterator->second;
-        }
+        const auto [iterator, inserted] = unique_vertices_indices.try_emplace(vertex, static_cast<uint32_t>(index));
+        new_vertices_indices[index] = iterator->second;
     }
 
     for (const Face& face : faces)
@@ -375,8 +413,9 @@ bool packCharts(
     uint32_t& texture_width,
     uint32_t& texture_height)
 {
-    // Create an xatlas object and register the mesh with the basic UV coordinates
-    xatlas::Atlas* atlas = xatlas::Create();
+    // Create an xatlas object managed via RAII and register the mesh with the basic UV coordinates
+    using AtlasPtr = std::unique_ptr<xatlas::Atlas, decltype([](xatlas::Atlas* a) noexcept { xatlas::Destroy(a); })>;
+    const AtlasPtr atlas{ xatlas::Create() };
     xatlas::UvMeshDecl mesh;
     mesh.vertexUvData = uv_coords.data();
     mesh.indexData = faces.data();
@@ -385,9 +424,8 @@ bool packCharts(
     mesh.indexCount = faces.size() * 3;
     mesh.indexFormat = xatlas::IndexFormat::UInt32;
 
-    if (xatlas::AddUvMesh(atlas, mesh) != xatlas::AddMeshError::Success)
+    if (xatlas::AddUvMesh(atlas.get(), mesh) != xatlas::AddMeshError::Success)
     {
-        xatlas::Destroy(atlas);
         spdlog::error("Error adding mesh");
         return false;
     }
@@ -397,11 +435,11 @@ bool packCharts(
     constexpr uint32_t desired_definition = 4096;
 
     // Set the pre-calculated faces groups
-    xatlas::SetCharts(atlas, charts);
+    xatlas::SetCharts(atlas.get(), charts);
 
     // Now pack the charts on the image
     constexpr xatlas::PackOptions pack_options{ .padding = 0, .resolution = calculation_definition };
-    xatlas::PackCharts(atlas, pack_options);
+    xatlas::PackCharts(atlas.get(), pack_options);
 
     // Now scale up the size
     texture_width = atlas->width;
@@ -421,7 +459,6 @@ bool packCharts(
         uv_coords[vertex.xref] = Point2F{ .x = vertex.uv[0] / width, .y = vertex.uv[1] / height };
     }
 
-    xatlas::Destroy(atlas);
     return true;
 }
 
