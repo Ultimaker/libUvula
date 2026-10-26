@@ -2,8 +2,8 @@
 
 #include "project.h"
 
+#include <algorithm>
 #include <polyclipping/clipper.hpp>
-#include <unordered_set>
 
 #include <spdlog/spdlog.h>
 
@@ -183,70 +183,134 @@ std::vector<Polygon> doProject(
     const Vector3F& camera_normal,
     const uint32_t face_id)
 {
-    std::vector<Polygon> result;
     const ClipperLib::Path stroke_polygon_path = toPath(stroke_polygon);
-
-    std::unordered_set<uint32_t> candidate_faces{ face_id };
-    std::unordered_set<uint32_t> processed_faces;
-
-    while (! candidate_faces.empty())
+    if (stroke_polygon_path.empty())
     {
-        auto iterator = candidate_faces.begin();
-        const uint32_t candidate_face_id = *iterator;
-        candidate_faces.erase(iterator);
+        return {};
+    }
 
-        processed_faces.insert(candidate_face_id);
+    ClipperLib::cInt stroke_min_x = stroke_polygon_path[0].X;
+    ClipperLib::cInt stroke_max_x = stroke_polygon_path[0].X;
+    ClipperLib::cInt stroke_min_y = stroke_polygon_path[0].Y;
+    ClipperLib::cInt stroke_max_y = stroke_polygon_path[0].Y;
+    for (size_t i = 1; i < stroke_polygon_path.size(); ++i)
+    {
+        stroke_min_x = std::min(stroke_min_x, stroke_polygon_path[i].X);
+        stroke_max_x = std::max(stroke_max_x, stroke_polygon_path[i].X);
+        stroke_min_y = std::min(stroke_min_y, stroke_polygon_path[i].Y);
+        stroke_max_y = std::max(stroke_max_y, stroke_polygon_path[i].Y);
+    }
+
+    const size_t num_faces = mesh_indices.empty() ? mesh_vertices.size() / 3 : mesh_indices.size();
+    std::vector<uint8_t> face_queued(std::max<size_t>(num_faces, static_cast<size_t>(face_id) + 1), 0);
+    std::vector<uint32_t> candidate_faces;
+    candidate_faces.reserve(64);
+    candidate_faces.push_back(face_id);
+    face_queued[face_id] = 1;
+
+    ClipperLib::Path projected_face_triangle_path(3);
+    ClipperLib::Clipper clipper;
+    ClipperLib::Paths intersected_paths;
+    ClipperLib::Paths uv_areas_path;
+
+    for (size_t head = 0; head < candidate_faces.size(); ++head)
+    {
+        const uint32_t candidate_face_id = candidate_faces[head];
 
         const Face face = getFace(mesh_indices, candidate_face_id);
         const Triangle3F face_triangle = getFaceTriangle(mesh_vertices, face);
-        const std::optional<Vector3F> face_normal = face_triangle.normal();
+        const Vector3F unnormalized_normal = Vector3F(face_triangle[0], face_triangle[1]).cross(Vector3F(face_triangle[0], face_triangle[2]));
+        constexpr float min_len_sq = std::numeric_limits<float>::epsilon() * std::numeric_limits<float>::epsilon();
 
-        if (! face_normal.has_value() || face_normal->dot(camera_normal) < 0)
+        if (unnormalized_normal.lengthSquared() <= min_len_sq || unnormalized_normal.dot(camera_normal) < 0.0f)
         {
             // Facing away from the viewer
             continue;
         }
 
         const Triangle2F projected_face_triangle = projectToViewport(face_triangle, camera_projection_matrix, is_camera_perspective, viewport_width, viewport_height);
-        const ClipperLib::Path projected_face_triangle_path
-            = toPath(std::initializer_list<Point2F>{ projected_face_triangle[0], projected_face_triangle[1], projected_face_triangle[2] });
-        const std::vector<Polygon> uv_areas = toPolygons(intersect(stroke_polygon_path, projected_face_triangle_path));
+        for (size_t i = 0; i < 3; ++i)
+        {
+            projected_face_triangle_path[i] = ClipperLib::IntPoint{
+                std::llround(projected_face_triangle[i].x * CLIPPER_PRECISION),
+                std::llround(projected_face_triangle[i].y * CLIPPER_PRECISION)
+            };
+        }
 
-        if (uv_areas.empty())
+        const auto tri_min_x = std::min({ projected_face_triangle_path[0].X, projected_face_triangle_path[1].X, projected_face_triangle_path[2].X });
+        const auto tri_max_x = std::max({ projected_face_triangle_path[0].X, projected_face_triangle_path[1].X, projected_face_triangle_path[2].X });
+        const auto tri_min_y = std::min({ projected_face_triangle_path[0].Y, projected_face_triangle_path[1].Y, projected_face_triangle_path[2].Y });
+        const auto tri_max_y = std::max({ projected_face_triangle_path[0].Y, projected_face_triangle_path[1].Y, projected_face_triangle_path[2].Y });
+        if (tri_max_x < stroke_min_x || tri_min_x > stroke_max_x || tri_max_y < stroke_min_y || tri_min_y > stroke_max_y)
         {
             continue;
         }
 
-        const Triangle2F face_uv = getFaceUv(mesh_uv, face);
-        for (const Polygon& uv_area : uv_areas)
+        clipper.Clear();
+        clipper.AddPath(stroke_polygon_path, ClipperLib::ptSubject, true);
+        clipper.AddPath(projected_face_triangle_path, ClipperLib::ptClip, true);
+        intersected_paths.clear();
+        clipper.Execute(ClipperLib::ctIntersection, intersected_paths);
+
+        if (intersected_paths.empty())
         {
-            const std::vector<Point3F> projected_stroke_polygon = getBarycentricCoordinates(uv_area, projected_face_triangle);
-            if (projected_stroke_polygon.empty())
-            {
-                continue;
-            }
+            continue;
+        }
 
-            Polygon result_polygon;
-            result_polygon.reserve(projected_stroke_polygon.size());
-            for (const Point3F& point : projected_stroke_polygon)
-            {
-                result_polygon.push_back(getTextureCoordinates(point, face_uv, texture_width, texture_height));
-            }
+        const Vector2F v0(projected_face_triangle[0], projected_face_triangle[1]);
+        const Vector2F v1(projected_face_triangle[0], projected_face_triangle[2]);
+        const double d00 = v0.dot(v0);
+        const double d01 = v0.dot(v1);
+        const double d11 = v1.dot(v1);
+        const double denom = d00 * d11 - d01 * d01;
+        constexpr double epsilon_triangle_cross_products = 0.001;
 
-            result.push_back(std::move(result_polygon));
+        if (std::abs(denom) >= epsilon_triangle_cross_products)
+        {
+            const Triangle2F face_uv = getFaceUv(mesh_uv, face);
+            for (const ClipperLib::Path& intersected_path : intersected_paths)
+            {
+                if (intersected_path.empty())
+                {
+                    continue;
+                }
+
+                ClipperLib::Path uv_path;
+                uv_path.reserve(intersected_path.size());
+                for (const ClipperLib::IntPoint& int_pt : intersected_path)
+                {
+                    const Point2F point{ int_pt.X / CLIPPER_PRECISION, int_pt.Y / CLIPPER_PRECISION };
+                    const Vector2F v2(projected_face_triangle[0], point);
+                    const double d20 = v2.dot(v0);
+                    const double d21 = v2.dot(v1);
+
+                    const double v = (d11 * d20 - d01 * d21) / denom;
+                    const double w = (d00 * d21 - d01 * d20) / denom;
+                    const double u = 1.0 - v - w;
+
+                    const Point2F tex_pt = getTextureCoordinates(Point3F(u, v, w), face_uv, texture_width, texture_height);
+                    uv_path.push_back(ClipperLib::IntPoint{
+                        std::llround(tex_pt.x * CLIPPER_PRECISION),
+                        std::llround(tex_pt.y * CLIPPER_PRECISION)
+                    });
+                }
+
+                uv_areas_path.push_back(std::move(uv_path));
+            }
         }
 
         const FaceSigned& connected_faces = mesh_faces_connectivity[candidate_face_id];
         for (const int32_t connected_face : connected_faces)
         {
-            if (connected_face >= 0 && ! processed_faces.contains(connected_face))
+            if (connected_face >= 0 && static_cast<size_t>(connected_face) < face_queued.size() && ! face_queued[connected_face])
             {
-                candidate_faces.insert(connected_face);
+                face_queued[connected_face] = 1;
+                candidate_faces.push_back(static_cast<uint32_t>(connected_face));
             }
         }
     }
 
-    return unionPolygons(result);
+    return toPolygons(unionPaths(uv_areas_path));
 }
 
 std::vector<Polygon> doGetConnectedFaces(
@@ -271,21 +335,17 @@ std::vector<Polygon> doGetConnectedFaces(
         return {};
     }
 
-    std::vector<Polygon> result;
-    std::unordered_set<uint32_t> visited_faces;
-    std::queue<uint32_t> faces_to_visit;
-    faces_to_visit.push(face_id);
-    while (! faces_to_visit.empty())
+    const size_t num_faces = mesh_indices.empty() ? mesh_vertices.size() / 3 : mesh_indices.size();
+    std::vector<uint8_t> visited_faces(std::max<size_t>(num_faces, static_cast<size_t>(face_id) + 1), 0);
+    std::vector<uint32_t> faces_to_visit;
+    faces_to_visit.reserve(64);
+    faces_to_visit.push_back(face_id);
+    visited_faces[face_id] = 1;
+
+    ClipperLib::Paths uv_areas_path;
+    for (size_t head = 0; head < faces_to_visit.size(); ++head)
     {
-        const uint32_t current_face_id = faces_to_visit.front();
-        faces_to_visit.pop();
-
-        if (visited_faces.contains(current_face_id))
-        {
-            continue;
-        }
-
-        visited_faces.insert(current_face_id);
+        const uint32_t current_face_id = faces_to_visit[head];
 
         const Face current_face = getFace(mesh_indices, current_face_id);
         const Triangle3F current_triangle = getFaceTriangle(mesh_vertices, current_face);
@@ -301,25 +361,31 @@ std::vector<Polygon> doGetConnectedFaces(
         {
             // Add the polygon to the result
             const Triangle2F current_uv = getFaceUv(mesh_uv, current_face);
-            Polygon current_polygon;
+            ClipperLib::Path current_path;
+            current_path.reserve(3);
             for (const Point2F& point_uv : current_uv)
             {
-                current_polygon.emplace_back(point_uv.x * texture_width, point_uv.y * texture_height);
+                const Point2F scaled_pt{ point_uv.x * texture_width, point_uv.y * texture_height };
+                current_path.push_back(ClipperLib::IntPoint{
+                    std::llround(scaled_pt.x * CLIPPER_PRECISION),
+                    std::llround(scaled_pt.y * CLIPPER_PRECISION)
+                });
             }
-            result.push_back(std::move(current_polygon));
+            uv_areas_path.push_back(std::move(current_path));
 
             // Visit the connected faces
             const FaceSigned& connected_faces = mesh_faces_connectivity[current_face_id];
 
             for (int32_t connected_face_id : connected_faces)
             {
-                if (connected_face_id >= 0 && ! visited_faces.contains(connected_face_id))
+                if (connected_face_id >= 0 && static_cast<size_t>(connected_face_id) < visited_faces.size() && ! visited_faces[connected_face_id])
                 {
-                    faces_to_visit.push(connected_face_id);
+                    visited_faces[connected_face_id] = 1;
+                    faces_to_visit.push_back(static_cast<uint32_t>(connected_face_id));
                 }
             }
         }
     }
 
-    return unionPolygons(result);
+    return toPolygons(unionPaths(uv_areas_path));
 }

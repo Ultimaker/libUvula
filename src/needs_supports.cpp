@@ -6,9 +6,8 @@
 #include <array>
 #include <cmath>
 #include <numeric>
-#include <queue>
-#include <set>
 #include <unordered_map>
+#include <vector>
 
 #include <range/v3/view/enumerate.hpp>
 #include <range/v3/view/iota.hpp>
@@ -32,6 +31,7 @@ std::tuple<const Point3F&, const Point3F&, const Point3F&> getVerticesEmpty(cons
 bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<const Point3F>& vertices, const std::span<const Face>& indices)
 {
     std::unordered_map<Point3F, bool> verts_with_lower;
+    verts_with_lower.reserve(vertices.size() / 4 + 1);
     // ^^^ Note that yes, this needs to be a Point3F, not a pointer to a Point3F, since we need to  be prepared for equivalent points.
     const auto handle_edge_func = [close_to_buildplate_dist, &verts_with_lower](const Point3F& a, const Point3F& b)
     {
@@ -59,15 +59,12 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
             continue;
         }
         const auto& face_norm = maybe_face_norm.value();
-        const bool norm_down = ((-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? std::asin(face_norm.y()) : 0.0f) < 0.0f;
+        const bool norm_down = (-1.0f <= face_norm.y() && face_norm.y() < 0.0f);
 
         // Mark each vertex as handled if the norm when that's up, otherwise check each edge.
         for (const auto& v : { a, b, c })
         {
-            if (! verts_with_lower.contains(v))
-            {
-                verts_with_lower[v] = norm_down;
-            }
+            verts_with_lower.try_emplace(v, norm_down);
         }
         if (norm_down)
         {
@@ -133,38 +130,35 @@ bool checkForDownFaces(
         return false;
     }
 
-    std::set<ptrdiff_t> visited;
-    const auto collect_neighbours_func = [&visited, &candidate_overhangs, &mesh_connects](const ptrdiff_t& start_face_idx)
+    std::vector<uint8_t> visited(face_count, 0);
+    std::vector<ptrdiff_t> to_visit;
+    const auto collect_neighbours_func = [&visited, &to_visit, &candidate_overhangs, &mesh_connects](const ptrdiff_t& start_face_idx)
     {
-        std::set<ptrdiff_t> collected_neighbours;
-        std::queue<ptrdiff_t> to_visit;
-        to_visit.push(start_face_idx);
-        visited.insert(start_face_idx);
-        while (! to_visit.empty())
+        to_visit.clear();
+        to_visit.push_back(start_face_idx);
+        visited[start_face_idx] = 1;
+        for (size_t head = 0; head < to_visit.size(); ++head)
         {
-            const ptrdiff_t face_idx = to_visit.front();
-            to_visit.pop();
-            collected_neighbours.insert(face_idx);
+            const ptrdiff_t face_idx = to_visit[head];
             for (const auto& nb_face_idx : mesh_connects[face_idx])
             {
-                if (nb_face_idx >= 0 && ! visited.contains(nb_face_idx) && candidate_overhangs.contains(nb_face_idx))
+                if (nb_face_idx >= 0 && static_cast<size_t>(nb_face_idx) < visited.size() && candidate_overhangs.contains(nb_face_idx) && ! visited[nb_face_idx])
                 {
-                    visited.insert(nb_face_idx);
-                    to_visit.push(nb_face_idx);
+                    visited[nb_face_idx] = 1;
+                    to_visit.push_back(nb_face_idx);
                 }
             }
         }
-        return collected_neighbours;
     };
 
     // Is there a big enough area that needs to be supported?
     for (const auto [face_idx, angle] : candidate_overhangs)
     {
-        if (visited.contains(face_idx))
+        if (visited[face_idx])
         {
             continue;
         }
-        const auto group{ collect_neighbours_func(face_idx) };
+        collect_neighbours_func(face_idx);
         const float group_area = std::accumulate(
             candidate_overhangs.begin(),
             candidate_overhangs.end(),

@@ -8,26 +8,28 @@
 class Point3F
 {
 public:
+    constexpr Point3F() noexcept = default;
+
     explicit Point3F(const float x, const float y, const float z);
 
-    [[nodiscard]] float x() const
+    [[nodiscard]] constexpr float x() const noexcept
     {
         return x_;
     }
 
-    [[nodiscard]] float y() const
+    [[nodiscard]] constexpr float y() const noexcept
     {
         return y_;
     }
 
-    [[nodiscard]] float z() const
+    [[nodiscard]] constexpr float z() const noexcept
     {
         return z_;
     }
 
     Point3F& operator/=(const float scale);
 
-    friend bool operator<(const Point3F& lhs, const Point3F& rhs)
+    friend constexpr bool operator<(const Point3F& lhs, const Point3F& rhs) noexcept
     {
         if (lhs.x_ != rhs.x_)
         {
@@ -42,18 +44,21 @@ public:
         return lhs.z_ < rhs.z_;
     }
 
-    inline bool operator==(const Point3F& other) const = default;
+    constexpr bool operator==(const Point3F& other) const noexcept = default;
 
     // NOTE: _Exact_ hash, don't use when comparison requires near-equal.
-    inline size_t hash_() const noexcept
+    [[nodiscard]] size_t hash_() const noexcept
     {
-        return std::hash<float>{}(x_) ^ (std::hash<float>{}(y_) << 1) ^ (std::hash<float>{}(z_) << 2);
+        size_t seed = std::hash<float>{}(x_);
+        seed ^= std::hash<float>{}(y_) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= std::hash<float>{}(z_) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return seed;
     }
 
 private:
-    float x_{ 0.0 };
-    float y_{ 0.0 };
-    float z_{ 0.0 };
+    float x_{ 0.0f };
+    float y_{ 0.0f };
+    float z_{ 0.0f };
 };
 
 namespace std
