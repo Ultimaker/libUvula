@@ -7,7 +7,9 @@
 #include <range/v3/view/enumerate.hpp>
 #include <range/v3/view/iota.hpp>
 #include <range/v3/numeric/iota.hpp>
-#include <map>
+#include <algorithm>
+#include <array>
+#include <cstdint>
 #include <unordered_map>
 
 std::tuple<int32_t, int32_t, int32_t> getIndexEquivFull(const std::vector<int32_t>& index_equivalances, const std::span<const Face>& indices, const int32_t face_idx)
@@ -32,58 +34,43 @@ void connectFaces(const std::span<const Point3F>& vertices, const std::span<cons
     // Build index equivalence mapping (in case of triangle-soup meshes).
     std::unordered_map<Point3F, int32_t> position_to_index;
     // ^^^ Note that yes, this needs to be a Point3F, not a pointer to a Point3F, since we need to  be prepared for equivalent points.
+    position_to_index.reserve(vertices.size());
     std::vector<int32_t> index_equivalaneces(vertices.size());
-    ranges::iota(index_equivalaneces, 0);
     for (const auto [i_vertex, vertex] : vertices | ranges::views::enumerate)
     {
-        if (position_to_index.contains(vertex))
-        {
-            index_equivalaneces[i_vertex] = position_to_index[vertex];
-        }
-        else
-        {
-            position_to_index[vertex] = i_vertex;
-        }
+        const auto [it, inserted] = position_to_index.try_emplace(vertex, static_cast<int32_t>(i_vertex));
+        index_equivalaneces[i_vertex] = it->second;
     }
 
     const auto& get_index_equiv_func = indices.empty() ? getIndexEquivEmpty : getIndexEquivFull;
-    const auto get_edge_list_func = [&indices, &index_equivalaneces, &get_index_equiv_func](const int32_t face_idx)
+
+    struct EdgeRef
     {
-        // An edge is represented by an pair of two vertex indices (smaller index first).
-        const auto [a, b, c] = get_index_equiv_func(index_equivalaneces, indices, face_idx);
-        return std::array{
-            std::make_pair(std::min(a, b), std::max(a, b)),
-            std::make_pair(std::min(b, c), std::max(b, c)),
-            std::make_pair(std::min(c, a), std::max(c, a))
-        };
+        int32_t face_idx;
+        int32_t edge_idx;
     };
 
-    std::map<std::pair<int32_t, int32_t>, int32_t> edge_to_face;
-    // ^^^ Would need to make hash for pair to make unordered_map work.
+    // An undirected edge is represented by the pair of its two vertex indices (smaller index first) packed into 64 bits.
+    const auto pack_edge_func = [](const int32_t vertex_idx1, const int32_t vertex_idx2)
+    {
+        return (static_cast<uint64_t>(std::min(vertex_idx1, vertex_idx2)) << 32) | static_cast<uint64_t>(std::max(vertex_idx1, vertex_idx2));
+    };
+
     const auto face_count = indices.empty() ? vertices.size() / 3 : indices.size();
+    std::unordered_map<uint64_t, EdgeRef> edge_to_face;
+    edge_to_face.reserve(face_count * 3);
     for (const int32_t face_idx : ranges::views::iota(0UL, face_count))
     {
-        const auto edges = get_edge_list_func(face_idx);
+        const auto [a, b, c] = get_index_equiv_func(index_equivalaneces, indices, face_idx);
+        const std::array<uint64_t, 3> edges{ pack_edge_func(a, b), pack_edge_func(b, c), pack_edge_func(c, a) };
         for (const auto [edge_idx, edge] : edges | ranges::views::enumerate)
         {
-            if (edge_to_face.contains(edge))
+            const auto [it, inserted] = edge_to_face.try_emplace(edge, EdgeRef{ face_idx, static_cast<int32_t>(edge_idx) });
+            if (! inserted)
             {
-                const int32_t other_face = edge_to_face[edge];
-                out_face_connects.at(face_idx).at(edge_idx) = other_face;
-
-                const auto other_edges = get_edge_list_func(other_face);
-                for (const auto [i_edge, e] : other_edges | ranges::views::enumerate)
-                {
-                    if (e == edge)
-                    {
-                        out_face_connects[other_face].at(i_edge) = face_idx;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                edge_to_face[edge] = face_idx;
+                const EdgeRef& other = it->second;
+                out_face_connects.at(face_idx).at(edge_idx) = other.face_idx;
+                out_face_connects[other.face_idx].at(other.edge_idx) = face_idx;
             }
         }
     }
