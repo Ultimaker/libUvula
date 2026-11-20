@@ -164,7 +164,7 @@ bool checkForDownFaces(
             island_area += candidate_overhangs[face_idx];
             for (const auto& nb_face_idx : mesh_connects[face_idx])
             {
-                if (nb_face_idx >= 0 && ! visited_faces[nb_face_idx] && candidate_overhangs[nb_face_idx] >= 0.0F)
+                if (nb_face_idx >= 0 && static_cast<size_t>(nb_face_idx) < face_count && ! visited_faces[nb_face_idx] && candidate_overhangs[nb_face_idx] >= 0.0F)
                 {
                     visited_faces[nb_face_idx] = true;
                     faces_to_visit.push_back(nb_face_idx);
