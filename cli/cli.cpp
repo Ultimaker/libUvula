@@ -97,7 +97,7 @@ int main(int argc, char** argv)
         for (size_t j = 0; j < mesh->mNumFaces; j++)
         {
             const aiFace& face = mesh->mFaces[j];
-            indices.emplace_back(face.mIndices[0], face.mIndices[1], face.mIndices[2]);
+            indices.push_back({ face.mIndices[0], face.mIndices[1], face.mIndices[2] });
         }
 
         std::vector<Point2F> uv_coords(mesh->mNumVertices, { 0.0, 0.0 });

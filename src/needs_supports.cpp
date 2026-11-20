@@ -5,9 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <numeric>
-#include <queue>
-#include <set>
+#include <vector>
+#include <cstdint>
 #include <unordered_map>
 
 #include <range/v3/view/enumerate.hpp>
@@ -59,7 +58,7 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
             continue;
         }
         const auto& face_norm = maybe_face_norm.value();
-        const bool norm_down = ((-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? std::asin(face_norm.y()) : 0.0f) < 0.0f;
+        const bool norm_down = face_norm.y() < 0.0F;
 
         // Mark each vertex as handled if the norm when that's up, otherwise check each edge.
         for (const auto& v : { a, b, c })
@@ -95,9 +94,13 @@ bool checkForDownFaces(
     const std::span<const Face>& indices,
     const std::span<const FaceSigned>& mesh_connects)
 {
-    std::unordered_map<ptrdiff_t, float> candidate_overhangs;
     const auto& get_vertices_func = indices.empty() ? getVerticesEmpty : getVerticesFull;
     const auto face_count = indices.empty() ? vertices.size() / 3 : indices.size();
+
+    // Area of each candidate overhang face, or a negative value if the face is not a candidate
+    std::vector<float> candidate_overhangs(face_count, -1.0F);
+
+    bool has_candidates = false;
     for (const auto& face_idx : ranges::views::iota(0UL, face_count))
     {
         const auto [a, b, c] = get_vertices_func(vertices, indices, face_idx);
@@ -109,6 +112,12 @@ bool checkForDownFaces(
             continue;
         }
         const auto& face_norm = maybe_face_norm.value();
+
+        // Upward-facing triangles can never be overhangs (support_angle is positive)
+        if (face_norm.y() >= 0.0F && support_angle > 0.0F)
+        {
+            continue;
+        }
 
         // Check the angle.
         const float angle = (-1.0f <= face_norm.y() && face_norm.y() <= 1.0f) ? -std::asin(face_norm.y()) : 0.0f;
@@ -126,54 +135,44 @@ bool checkForDownFaces(
         // Collect the area for further analysis.
         const float area = 0.5f * Vector3F(b, a).cross(Vector3F(c, a)).abs().length();
         candidate_overhangs[face_idx] = area;
+        has_candidates = true;
     }
 
-    if (candidate_overhangs.empty())
+    if (! has_candidates)
     {
         return false;
     }
 
-    std::set<ptrdiff_t> visited;
-    const auto collect_neighbours_func = [&visited, &candidate_overhangs, &mesh_connects](const ptrdiff_t& start_face_idx)
-    {
-        std::set<ptrdiff_t> collected_neighbours;
-        std::queue<ptrdiff_t> to_visit;
-        to_visit.push(start_face_idx);
-        visited.insert(start_face_idx);
-        while (! to_visit.empty())
-        {
-            const ptrdiff_t face_idx = to_visit.front();
-            to_visit.pop();
-            collected_neighbours.insert(face_idx);
-            for (const auto& nb_face_idx : mesh_connects[face_idx])
-            {
-                if (nb_face_idx >= 0 && ! visited.contains(nb_face_idx) && candidate_overhangs.contains(nb_face_idx))
-                {
-                    visited.insert(nb_face_idx);
-                    to_visit.push(nb_face_idx);
-                }
-            }
-        }
-        return collected_neighbours;
-    };
+    std::vector<bool> visited_faces(face_count, false);
+    std::vector<size_t> faces_to_visit;
 
     // Is there a big enough area that needs to be supported?
-    for (const auto [face_idx, angle] : candidate_overhangs)
+    for (size_t start_face_idx = 0; start_face_idx < face_count; ++start_face_idx)
     {
-        if (visited.contains(face_idx))
+        if (visited_faces[start_face_idx] || candidate_overhangs[start_face_idx] < 0.0F)
         {
             continue;
         }
-        const auto group{ collect_neighbours_func(face_idx) };
-        const float group_area = std::accumulate(
-            candidate_overhangs.begin(),
-            candidate_overhangs.end(),
-            0.0f,
-            [](const float& a, const std::pair<ptrdiff_t, float>& b)
+
+        float island_area = 0.0F;
+        visited_faces[start_face_idx] = true;
+        faces_to_visit.push_back(start_face_idx);
+        while (! faces_to_visit.empty())
+        {
+            const size_t face_idx = faces_to_visit.back();
+            faces_to_visit.pop_back();
+            island_area += candidate_overhangs[face_idx];
+            for (const auto& nb_face_idx : mesh_connects[face_idx])
             {
-                return a + b.second;
-            });
-        if (group_area >= min_support_area)
+                if (nb_face_idx >= 0 && static_cast<size_t>(nb_face_idx) < face_count && ! visited_faces[nb_face_idx] && candidate_overhangs[nb_face_idx] >= 0.0F)
+                {
+                    visited_faces[nb_face_idx] = true;
+                    faces_to_visit.push_back(nb_face_idx);
+                }
+            }
+        }
+
+        if (island_area >= min_support_area)
         {
             return true;
         }
