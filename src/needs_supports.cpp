@@ -58,7 +58,7 @@ bool checkForDownVertices(const float close_to_buildplate_dist, const std::span<
             continue;
         }
         const auto& face_norm = maybe_face_norm.value();
-        const bool norm_down = face_norm.y() < 0.0F;
+        const bool norm_down = face_norm.y() < 0.0f;
 
         // Mark each vertex as handled if the norm when that's up, otherwise check each edge.
         for (const auto& v : { a, b, c })
@@ -114,7 +114,7 @@ bool checkForDownFaces(
         const auto& face_norm = maybe_face_norm.value();
 
         // Upward-facing triangles can never be overhangs (support_angle is positive)
-        if (face_norm.y() >= 0.0F && support_angle > 0.0F)
+        if (face_norm.y() >= 0.0f && support_angle > 0.0f)
         {
             continue;
         }
@@ -149,12 +149,12 @@ bool checkForDownFaces(
     // Is there a big enough area that needs to be supported?
     for (size_t start_face_idx = 0; start_face_idx < face_count; ++start_face_idx)
     {
-        if (visited_faces[start_face_idx] || candidate_overhangs[start_face_idx] < 0.0F)
+        if (visited_faces[start_face_idx] || candidate_overhangs[start_face_idx] < 0.0f)
         {
             continue;
         }
 
-        float island_area = 0.0F;
+        float island_area = 0.0f;
         visited_faces[start_face_idx] = true;
         faces_to_visit.push_back(start_face_idx);
         while (! faces_to_visit.empty())
@@ -164,7 +164,7 @@ bool checkForDownFaces(
             island_area += candidate_overhangs[face_idx];
             for (const auto& nb_face_idx : mesh_connects[face_idx])
             {
-                if (nb_face_idx >= 0 && static_cast<size_t>(nb_face_idx) < face_count && ! visited_faces[nb_face_idx] && candidate_overhangs[nb_face_idx] >= 0.0F)
+                if (nb_face_idx >= 0 && static_cast<size_t>(nb_face_idx) < face_count && ! visited_faces[nb_face_idx] && candidate_overhangs[nb_face_idx] >= 0.0f)
                 {
                     visited_faces[nb_face_idx] = true;
                     faces_to_visit.push_back(nb_face_idx);
